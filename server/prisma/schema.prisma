@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model College {
+  id            Int       @id @default(autoincrement())
+  name          String
+  city          String?
+  state         String?
+  type          String?   // Private / Deemed / Government
+  address       String?
+  phone         String?
+  email         String?
+  website       String?
+  logoUrl       String?
+  description   String?
+  approvedBy    String?   // INC / KNC / AICTE / UGC etc.
+  accreditation String?   // NAAC grade, NBA etc.
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  courses            Course[]
+  enquiries          Enquiry[]
+  commissions        Commission[]
+  contacts           CollegeContact[]
+  consultantColleges ConsultantCollege[]
+
+  @@unique([name])
+  @@map("colleges")
+}
+
+model Course {
+  id           Int     @id @default(autoincrement())
+  collegeId    Int
+  name         String
+  category     String? // Nursing / Engineering / Allied Health…
+  degreeLevel  String? // UG / PG / Diploma / Lateral
+  durationYrs  Float?
+  quota        String? // General / Management / NRI
+  y1Fee        Int?
+  y2Fee        Int?
+  y3Fee        Int?
+  y4Fee        Int?
+  y5Fee        Int?
+  totalFee     Int?
+  hostelPerYr  Int?
+  notes        String?
+  isActive     Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  college   College   @relation(fields: [collegeId], references: [id])
+  enquiries Enquiry[]
+
+  @@map("courses")
+}
+
+model Student {
+  id            Int      @id @default(autoincrement())
+  name          String
+  phone         String   @unique
+  email         String?
+  city          String?
+  preferredCat  String?  // Nursing, Engineering…
+  preferredCity String?
+  budgetMax     Int?
+  percentage    Float?   // 12th percentage
+  stream        String?  // Science / Commerce / Arts / Biology
+  source        String?  // WhatsApp / Website / Referral / Walk-in
+  counselorId   Int?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  counselor User?     @relation(fields: [counselorId], references: [id])
+  enquiries Enquiry[]
+
+  @@map("students")
+}
+
+model Enquiry {
+  id             Int      @id @default(autoincrement())
+  studentId      Int
+  collegeId      Int
+  courseId       Int?
+  status         String   @default("New") // New / Contacted / Visited / Applied / Enrolled / Dropped
+  counselorId    Int?
+  followUpDate   DateTime?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  student    Student     @relation(fields: [studentId], references: [id])
+  college    College     @relation(fields: [collegeId], references: [id])
+  course     Course?     @relation(fields: [courseId], references: [id])
+  counselor  User?       @relation(fields: [counselorId], references: [id])
+  commission Commission?
+
+  @@map("enquiries")
+}
+
+model Commission {
+  id          Int      @id @default(autoincrement())
+  enquiryId   Int      @unique
+  collegeId   Int
+  amount      Int?
+  status      String   @default("Pending") // Pending / Received / Written Off
+  paymentDate DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  enquiry Enquiry @relation(fields: [enquiryId], references: [id])
+  college College @relation(fields: [collegeId], references: [id])
+
+  @@map("commissions")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("staff") // admin / staff / consultant
+  phone        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  students           Student[]
+  enquiries          Enquiry[]
+  consultantColleges ConsultantCollege[]
+
+  @@map("users")
+}
+
+// Links a consultant to the specific colleges they manage
+model ConsultantCollege {
+  id        Int @id @default(autoincrement())
+  userId    Int
+  collegeId Int
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  college College @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, collegeId])
+  @@map("consultant_colleges")
+}
+
+model CollegeContact {
+  id          Int    @id @default(autoincrement())
+  collegeId   Int
+  name        String
+  designation String?
+  phone       String?
+  email       String?
+
+  college College @relation(fields: [collegeId], references: [id])
+
+  @@map("college_contacts")
+}
