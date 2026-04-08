@@ -2,14 +2,22 @@
   "version": 2,
   "builds": [
     {
+      "src": "public/**",
+      "use": "@vercel/static"
+    },
+    {
       "src": "src/index.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["public/**", "prisma/**"]
+        "includeFiles": ["prisma/**"]
       }
     }
   ],
   "routes": [
+    { "src": "/assets/(.*)", "dest": "/public/assets/$1" },
+    { "src": "/logo.png", "dest": "/public/logo.png" },
+    { "src": "/robots.txt", "dest": "/public/robots.txt" },
+    { "src": "/sitemap.xml", "dest": "/public/sitemap.xml" },
     { "src": "/(.*)", "dest": "src/index.js" }
   ]
 }
