@@ -9,7 +9,6 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "vercel-build": "cd ../client && npm install && npm run build && mkdir -p ../server/public && cp -r dist/* ../server/public/",
     "postinstall": "prisma generate",
     "db:push": "npx prisma db push",
     "db:seed": "node prisma/seed.js",
