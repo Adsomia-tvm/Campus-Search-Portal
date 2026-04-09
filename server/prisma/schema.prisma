@@ -32,6 +32,9 @@ model College {
   consultantColleges ConsultantCollege[]
 
   @@unique([name])
+  @@index([city])
+  @@index([isActive])
+  @@index([isActive, city])
   @@map("colleges")
 }
 
@@ -58,6 +61,9 @@ model Course {
   college   College   @relation(fields: [collegeId], references: [id])
   enquiries Enquiry[]
 
+  @@index([collegeId])
+  @@index([category])
+  @@index([isActive, category])
   @@map("courses")
 }
 
@@ -81,6 +87,8 @@ model Student {
   counselor User?     @relation(fields: [counselorId], references: [id])
   enquiries Enquiry[]
 
+  @@index([counselorId])
+  @@index([source])
   @@map("students")
 }
 
@@ -102,6 +110,11 @@ model Enquiry {
   counselor  User?       @relation(fields: [counselorId], references: [id])
   commission Commission?
 
+  @@index([studentId])
+  @@index([collegeId])
+  @@index([status])
+  @@index([counselorId])
+  @@index([createdAt])
   @@map("enquiries")
 }
 

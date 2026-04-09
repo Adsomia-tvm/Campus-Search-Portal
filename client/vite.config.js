@@ -7,4 +7,15 @@ export default defineConfig({
     port: 5173,
     proxy: { '/api': { target: 'http://localhost:4000', changeOrigin: true } },
   },
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          ui: ['axios', 'zustand'],
+        },
+      },
+    },
+  },
 });

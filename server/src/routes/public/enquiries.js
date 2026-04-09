@@ -1,7 +1,6 @@
 const router = require('express').Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../lib/prisma');
 const nodemailer = require('nodemailer');
-const prisma = new PrismaClient();
 
 // POST /api/enquiries — student submits enquiry from public website
 router.post('/', async (req, res) => {
@@ -9,14 +8,18 @@ router.post('/', async (req, res) => {
     const { name, phone, email, city, preferredCat, preferredCity, budgetMax,
             percentage, stream, collegeId, courseId, source = 'Website' } = req.body;
 
-    if (!name || !phone) return res.status(400).json({ error: 'Name and phone are required' });
-    if (!collegeId)      return res.status(400).json({ error: 'College is required' });
+    // Validate & sanitize input
+    const cleanName = (name || '').replace(/<[^>]*>/g, '').trim().slice(0, 100);
+    const cleanPhone = (phone || '').replace(/[\s\-\(\)]/g, '');
+    if (!cleanName || !cleanPhone) return res.status(400).json({ error: 'Name and phone are required' });
+    if (!/^\+?[0-9]{10,13}$/.test(cleanPhone)) return res.status(400).json({ error: 'Enter a valid 10-digit phone number' });
+    if (!collegeId) return res.status(400).json({ error: 'College is required' });
 
     // Upsert student (phone is unique)
     const student = await prisma.student.upsert({
-      where: { phone },
-      update: { name, email, city, preferredCat, preferredCity, budgetMax: budgetMax ? Number(budgetMax) : null, percentage: percentage ? Number(percentage) : null, stream },
-      create: { name, phone, email, city, preferredCat, preferredCity, budgetMax: budgetMax ? Number(budgetMax) : null, percentage: percentage ? Number(percentage) : null, stream, source },
+      where: { phone: cleanPhone },
+      update: { name: cleanName, email, city, preferredCat, preferredCity, budgetMax: budgetMax ? Number(budgetMax) : null, percentage: percentage ? Number(percentage) : null, stream },
+      create: { name: cleanName, phone: cleanPhone, email, city, preferredCat, preferredCity, budgetMax: budgetMax ? Number(budgetMax) : null, percentage: percentage ? Number(percentage) : null, stream, source },
     });
 
     const enquiry = await prisma.enquiry.create({

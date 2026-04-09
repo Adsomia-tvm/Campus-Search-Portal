@@ -1,7 +1,6 @@
 const router = require('express').Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../lib/prisma');
 const { requireTeamMember } = require('../../middleware/auth');
-const prisma = new PrismaClient();
 
 router.use(requireTeamMember);
 
@@ -58,11 +57,27 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Whitelist allowed fields to prevent mass assignment
+function pickEnquiryCreate(body) {
+  const { studentId, collegeId, courseId, status, counselorId, notes } = body;
+  return { studentId: Number(studentId), collegeId: Number(collegeId),
+           courseId: courseId ? Number(courseId) : null,
+           status: status || 'New', counselorId: counselorId ? Number(counselorId) : null, notes };
+}
+function pickEnquiryUpdate(body) {
+  const allowed = ['status','counselorId','followUpDate','notes'];
+  const data = {};
+  for (const key of allowed) {
+    if (body[key] !== undefined) data[key] = key === 'counselorId' ? Number(body[key]) : body[key];
+  }
+  return data;
+}
+
 // POST /api/admin/enquiries
 router.post('/', async (req, res) => {
   try {
     const enquiry = await prisma.enquiry.create({
-      data: { ...req.body, status: req.body.status || 'New' },
+      data: pickEnquiryCreate(req.body),
       include: { student: true, college: { select: { name: true } } },
     });
     res.status(201).json(enquiry);
@@ -76,7 +91,7 @@ router.put('/:id', async (req, res) => {
   try {
     const enquiry = await prisma.enquiry.update({
       where: { id: Number(req.params.id) },
-      data: req.body,
+      data: pickEnquiryUpdate(req.body),
       include: { student: { select: { name: true, phone: true } }, college: { select: { name: true } } },
     });
 

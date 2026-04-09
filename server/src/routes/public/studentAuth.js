@@ -1,9 +1,11 @@
 const router = require('express').Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../lib/prisma');
 const jwt = require('jsonwebtoken');
-
-const prisma = new PrismaClient();
-const STUDENT_SECRET = process.env.STUDENT_JWT_SECRET || process.env.JWT_SECRET || 'student-secret-2026';
+const STUDENT_SECRET = process.env.STUDENT_JWT_SECRET || process.env.JWT_SECRET;
+if (!STUDENT_SECRET) {
+  console.error('FATAL: STUDENT_JWT_SECRET or JWT_SECRET env var is required');
+  process.exit(1);
+}
 
 // ── POST /api/student/auth ────────────────────────────────────────────────────
 // Passwordless: phone is the unique key. New phone = signup (creates lead).

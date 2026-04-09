@@ -1,9 +1,8 @@
 const router = require('express').Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../lib/prisma');
 const multer = require('multer');
 const XLSX = require('xlsx');
 const { requireAdmin } = require('../../middleware/auth');
-const prisma = new PrismaClient();
 
 router.use(requireAdmin);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });

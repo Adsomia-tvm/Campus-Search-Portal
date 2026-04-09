@@ -1,8 +1,7 @@
 const router = require('express').Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../lib/prisma');
 const bcrypt = require('bcryptjs');
 const { requireAdmin, requireTeamMember } = require('../../middleware/auth');
-const prisma = new PrismaClient();
 
 // GET /api/admin/users — admin sees all, others see only themselves
 router.get('/', requireTeamMember, async (req, res) => {

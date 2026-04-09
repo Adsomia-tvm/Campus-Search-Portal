@@ -1,7 +1,6 @@
 const router = require('express').Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../lib/prisma');
 const { requireAuth } = require('../../middleware/auth');
-const prisma = new PrismaClient();
 
 router.use(requireAuth);
 
@@ -30,10 +29,20 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Whitelist allowed fields
+function pickCommissionFields(body) {
+  const allowed = ['enquiryId','collegeId','amount','status','paymentDate','notes'];
+  const data = {};
+  for (const key of allowed) {
+    if (body[key] !== undefined) data[key] = body[key];
+  }
+  return data;
+}
+
 // POST /api/admin/commissions
 router.post('/', async (req, res) => {
   try {
-    const commission = await prisma.commission.create({ data: req.body });
+    const commission = await prisma.commission.create({ data: pickCommissionFields(req.body) });
     res.status(201).json(commission);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -43,7 +52,7 @@ router.post('/', async (req, res) => {
 // PUT /api/admin/commissions/:id
 router.put('/:id', async (req, res) => {
   try {
-    const data = { ...req.body };
+    const data = pickCommissionFields(req.body);
     if (data.status === 'Received' && !data.paymentDate) data.paymentDate = new Date();
     const commission = await prisma.commission.update({ where: { id: Number(req.params.id) }, data });
     res.json(commission);

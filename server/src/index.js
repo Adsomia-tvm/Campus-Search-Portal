@@ -13,6 +13,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
@@ -51,12 +52,22 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// Rate limiting
+// Rate limiting — global
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300 });
 app.use(limiter);
+
+// Stricter rate limits on sensitive endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 10,
+  message: { error: 'Too many login attempts. Try again in 15 minutes.' },
+});
+const enquiryLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, max: 10,
+  message: { error: 'Too many submissions from this IP. Try again later.' },
+});
 
 // ── Serve built React app (public/ folder) ────────────────────────────────────
 const _distPath = process.env.DIST_PATH || _path.join(__dirname, '..', 'public');
@@ -64,12 +75,13 @@ app.use(express.static(_distPath));
 
 // ── Public Routes ─────────────────────────────────────────────────────────────
 app.use('/api/colleges',      require('./routes/public/colleges'));
-app.use('/api/enquiries',     require('./routes/public/enquiries'));
-app.use('/api/career-leads',  require('./routes/public/careerLeads'));
+app.use('/api/enquiries',     enquiryLimiter, require('./routes/public/enquiries'));
+app.use('/api/career-leads',  enquiryLimiter, require('./routes/public/careerLeads'));
 app.use('/api/categories',    require('./routes/public/categories'));
-app.use('/api/student',       require('./routes/public/studentAuth'));
+app.use('/api/student',       enquiryLimiter, require('./routes/public/studentAuth'));
 
 // ── Admin Routes (JWT protected) ──────────────────────────────────────────────
+app.use('/api/auth/login',    authLimiter);
 app.use('/api/auth',                require('./routes/admin/auth'));
 app.use('/api/admin/dashboard',     require('./routes/admin/dashboard'));
 app.use('/api/admin/students',      require('./routes/admin/students'));
@@ -85,9 +97,8 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date(), 
 
 // ── Dynamic sitemap.xml — includes every active college URL ──────────────────
 app.get('/sitemap.xml', async (req, res) => {
-  const { PrismaClient } = require('@prisma/client');
-  const prisma = new PrismaClient();
-  const BASE = 'https://campus-search-iota.vercel.app';
+  const prisma = require('./lib/prisma');
+  const BASE = process.env.PORTAL_URL || 'https://app.campussearch.in';
   const now = new Date().toISOString().split('T')[0];
   try {
     const colleges = await prisma.college.findMany({
@@ -121,8 +132,6 @@ ${allUrls.map(u => `  <url>
   } catch (e) {
     console.error('Sitemap error:', e.message);
     res.status(500).send('Sitemap generation failed');
-  } finally {
-    await prisma.$disconnect();
   }
 });
 
@@ -146,8 +155,7 @@ if (require.main === module) {
 
   // Cache warm-up on local startup
   const { staticCache } = require('./cache');
-  const { PrismaClient: PC2 } = require('@prisma/client');
-  const _p = new PC2();
+  const _p = require('./lib/prisma');
   setTimeout(async () => {
     try {
       const [cities, cats] = await Promise.all([
@@ -158,7 +166,6 @@ if (require.main === module) {
       staticCache.set('categories', cats.map(c=>({category:c.category,count:c._count.id})));
       console.log(`🗂️  Cache warmed: ${cities.length} cities, ${cats.length} categories`);
     } catch(e) { console.warn('Cache warmup failed:', e.message); }
-    finally { _p.$disconnect(); }
   }, 2000);
 }
 

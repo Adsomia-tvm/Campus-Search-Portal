@@ -1,7 +1,6 @@
 const router = require('express').Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../lib/prisma');
 const { searchCache, staticCache, detailCache } = require('../../cache');
-const prisma = new PrismaClient();
 
 // GET /api/colleges — search & filter
 router.get('/', async (req, res) => {
@@ -231,9 +230,7 @@ router.get('/:id/stats', async (req, res) => {
       where: { collegeId: id, createdAt: { gte: since } },
     });
 
-    // Add a small randomised floor so new colleges show > 0 (min 3, max count + 5)
-    const display = Math.max(count, Math.floor(Math.random() * 4) + 2);
-    res.json({ enquiriesThisWeek: display });
+    res.json({ enquiriesThisWeek: count });
   } catch (err) {
     res.status(500).json({ enquiriesThisWeek: 3 });
   }

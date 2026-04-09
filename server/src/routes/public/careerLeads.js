@@ -1,7 +1,6 @@
 const router = require('express').Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../lib/prisma');
 const nodemailer = require('nodemailer');
-const prisma = new PrismaClient();
 
 // POST /api/career-leads — Career Clarity form submission from campussearch.in
 router.post('/', async (req, res) => {
@@ -71,7 +70,7 @@ async function sendNotification({ student, topCareer, allMatches, stage, stream 
         <tr><td style="padding:8px;border:1px solid #eee;font-weight:bold">All Matches</td><td style="padding:8px;border:1px solid #eee">${allMatches?.join(', ') || '—'}</td></tr>
       </table>
       <p style="margin-top:16px">
-        <a href="${process.env.CLIENT_URL || 'https://campus-search-iota.vercel.app'}/admin/students"
+        <a href="${process.env.CLIENT_URL || 'https://app.campussearch.in'}/admin/students"
            style="background:#E8593C;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold">
           View in Admin Panel →
         </a>

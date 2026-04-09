@@ -37,3 +37,4 @@ Thumbs.db
 # Uploaded files / temp
 uploads/
 tmp/
+.env*.local

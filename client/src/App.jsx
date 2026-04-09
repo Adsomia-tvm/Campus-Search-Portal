@@ -1,24 +1,33 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './context/auth';
 
-// Public pages
-import Home          from './pages/Home';
-import Search        from './pages/Search';
-import CollegeDetail from './pages/CollegeDetail';
-import Compare       from './pages/Compare';
-import Enquiry       from './pages/Enquiry';
-import Thanks        from './pages/Thanks';
+// Public pages — lazy loaded
+const Home          = lazy(() => import('./pages/Home'));
+const Search        = lazy(() => import('./pages/Search'));
+const CollegeDetail = lazy(() => import('./pages/CollegeDetail'));
+const Compare       = lazy(() => import('./pages/Compare'));
+const Enquiry       = lazy(() => import('./pages/Enquiry'));
+const Thanks        = lazy(() => import('./pages/Thanks'));
 
-// Admin pages
-import Login         from './pages/admin/Login';
-import Dashboard     from './pages/admin/Dashboard';
-import Students      from './pages/admin/Students';
-import Enquiries     from './pages/admin/Enquiries';
-import Colleges      from './pages/admin/Colleges';
-import Commissions   from './pages/admin/Commissions';
-import Reports       from './pages/admin/Reports';
-import Team          from './pages/admin/Team';
-import AdminLayout   from './components/AdminLayout';
+// Admin pages — lazy loaded (only downloaded when admin navigates)
+const Login         = lazy(() => import('./pages/admin/Login'));
+const Dashboard     = lazy(() => import('./pages/admin/Dashboard'));
+const Students      = lazy(() => import('./pages/admin/Students'));
+const Enquiries     = lazy(() => import('./pages/admin/Enquiries'));
+const Colleges      = lazy(() => import('./pages/admin/Colleges'));
+const Commissions   = lazy(() => import('./pages/admin/Commissions'));
+const Reports       = lazy(() => import('./pages/admin/Reports'));
+const Team          = lazy(() => import('./pages/admin/Team'));
+const AdminLayout   = lazy(() => import('./components/AdminLayout'));
+
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+    </div>
+  );
+}
 
 function PrivateRoute({ children, roles }) {
   const { token, user } = useAuthStore();
@@ -29,6 +38,7 @@ function PrivateRoute({ children, roles }) {
 
 export default function App() {
   return (
+    <Suspense fallback={<LoadingFallback />}>
     <Routes>
       {/* Public */}
       <Route path="/"             element={<Home />} />
@@ -50,5 +60,6 @@ export default function App() {
         <Route path="team"        element={<PrivateRoute roles={['admin']}><Team /></PrivateRoute>} />
       </Route>
     </Routes>
+    </Suspense>
   );
 }

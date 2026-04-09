@@ -5,4 +5,4 @@ Allow: /
 Disallow: /admin/
 Disallow: /api/
 
-Sitemap: https://campus-search-iota.vercel.app/sitemap.xml
+Sitemap: https://app.campussearch.in/sitemap.xml

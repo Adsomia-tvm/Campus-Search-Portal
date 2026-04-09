@@ -1,7 +1,6 @@
 const router = require('express').Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../lib/prisma');
 const { requireAuth } = require('../../middleware/auth');
-const prisma = new PrismaClient();
 
 router.use(requireAuth);
 
@@ -29,10 +28,21 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Whitelist allowed fields
+function pickStudentFields(body) {
+  const allowed = ['name','phone','email','city','preferredCat','preferredCity',
+                    'budgetMax','percentage','stream','source','counselorId','notes'];
+  const data = {};
+  for (const key of allowed) {
+    if (body[key] !== undefined) data[key] = body[key];
+  }
+  return data;
+}
+
 // POST /api/admin/students
 router.post('/', async (req, res) => {
   try {
-    const student = await prisma.student.create({ data: req.body });
+    const student = await prisma.student.create({ data: pickStudentFields(req.body) });
     res.status(201).json(student);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -56,7 +66,7 @@ router.get('/:id', async (req, res) => {
 // PUT /api/admin/students/:id
 router.put('/:id', async (req, res) => {
   try {
-    const student = await prisma.student.update({ where: { id: Number(req.params.id) }, data: req.body });
+    const student = await prisma.student.update({ where: { id: Number(req.params.id) }, data: pickStudentFields(req.body) });
     res.json(student);
   } catch (err) {
     res.status(400).json({ error: err.message });

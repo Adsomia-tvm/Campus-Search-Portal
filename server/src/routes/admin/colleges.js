@@ -1,7 +1,6 @@
 const router = require('express').Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../lib/prisma');
 const { requireAuth, requireAdmin } = require('../../middleware/auth');
-const prisma = new PrismaClient();
 
 router.use(requireAuth);
 
@@ -28,10 +27,21 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Whitelist allowed fields to prevent mass assignment
+function pickCollegeFields(body) {
+  const allowed = ['name','city','state','type','address','phone','email','website',
+                    'logoUrl','description','approvedBy','accreditation','isActive'];
+  const data = {};
+  for (const key of allowed) {
+    if (body[key] !== undefined) data[key] = body[key];
+  }
+  return data;
+}
+
 // POST /api/admin/colleges
 router.post('/', requireAdmin, async (req, res) => {
   try {
-    const college = await prisma.college.create({ data: req.body });
+    const college = await prisma.college.create({ data: pickCollegeFields(req.body) });
     res.status(201).json(college);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -41,7 +51,7 @@ router.post('/', requireAdmin, async (req, res) => {
 // PUT /api/admin/colleges/:id
 router.put('/:id', requireAdmin, async (req, res) => {
   try {
-    const college = await prisma.college.update({ where: { id: Number(req.params.id) }, data: req.body });
+    const college = await prisma.college.update({ where: { id: Number(req.params.id) }, data: pickCollegeFields(req.body) });
     res.json(college);
   } catch (err) {
     res.status(400).json({ error: err.message });
