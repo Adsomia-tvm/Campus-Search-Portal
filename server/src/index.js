@@ -20,7 +20,7 @@ app.use((req, res, next) => {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
     "img-src 'self' data: https:; " +
-    "connect-src 'self' https://campus-search-iota.vercel.app; " +
+    "connect-src 'self' https://app.campussearch.in https://campussearch.in; " +
     "frame-ancestors 'none';"
   );
   next();
@@ -31,6 +31,7 @@ const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:4000',
   'http://localhost:3000',
+  'https://app.campussearch.in',
   'https://campus-search-iota.vercel.app',
   'https://campus-search-website.vercel.app',
   'https://campussearch.in',
@@ -40,8 +41,8 @@ const ALLOWED_ORIGINS = [
 
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow server-to-server (no origin) and allowlisted origins only
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+    // Allow server-to-server (no origin/null origin) and allowlisted origins only
+    if (!origin || origin === 'null' || ALLOWED_ORIGINS.includes(origin)) {
       cb(null, true);
     } else {
       cb(new Error(`CORS: origin ${origin} not allowed`));
