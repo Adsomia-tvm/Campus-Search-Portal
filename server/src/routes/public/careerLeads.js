@@ -70,7 +70,7 @@ async function sendNotification({ student, topCareer, allMatches, stage, stream 
         <tr><td style="padding:8px;border:1px solid #eee;font-weight:bold">All Matches</td><td style="padding:8px;border:1px solid #eee">${allMatches?.join(', ') || '—'}</td></tr>
       </table>
       <p style="margin-top:16px">
-        <a href="${process.env.CLIENT_URL || 'https://app.campussearch.in'}/admin/students"
+        <a href="${process.env.CLIENT_URL || 'https://campussearch.in'}/admin/students"
            style="background:#E8593C;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold">
           View in Admin Panel
         </a>

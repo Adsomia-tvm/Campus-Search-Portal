@@ -1,0 +1,1 @@
+import{r}from"./vendor-CoEOH1Tt.js";function i(e){r.useEffect(()=>{if(!e)return;const t=document.createElement("script");return t.type="application/ld+json",t.id=`ld-${e["@type"]||"schema"}`,t.text=JSON.stringify({"@context":"https://schema.org",...e}),document.head.appendChild(t),()=>{const n=document.getElementById(t.id);n&&n.remove()}},[JSON.stringify(e)])}export{i as u};

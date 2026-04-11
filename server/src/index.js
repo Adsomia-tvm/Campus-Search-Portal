@@ -21,7 +21,7 @@ app.use((req, res, next) => {
     "style-src 'self' https://fonts.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
     "img-src 'self' data: https:; " +
-    "connect-src 'self' https://app.campussearch.in https://campussearch.in; " +
+    "connect-src 'self' https://campussearch.in https://www.campussearch.in; " +
     "frame-ancestors 'none';"
   );
   next();
@@ -32,11 +32,11 @@ const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:4000',
   'http://localhost:3000',
+  'https://campussearch.in',
+  'https://www.campussearch.in',
   'https://app.campussearch.in',
   'https://campus-search-iota.vercel.app',
   'https://campus-search-website.vercel.app',
-  'https://campussearch.in',
-  'https://www.campussearch.in',
   ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
 ];
 
@@ -112,7 +112,7 @@ app.get('/api/health', async (req, res) => {
 // ── Dynamic sitemap.xml — includes every active college URL ──────────────────
 app.get('/sitemap.xml', async (req, res) => {
   const prisma = require('./lib/prisma');
-  const BASE = process.env.PORTAL_URL || 'https://app.campussearch.in';
+  const BASE = process.env.PORTAL_URL || 'https://campussearch.in';
   const now = new Date().toISOString().split('T')[0];
   try {
     const colleges = await prisma.college.findMany({
@@ -182,7 +182,7 @@ function getIndexHtml() {
 // Helper to inject meta tags into index.html for bots
 function injectMeta(html, { title, description, canonical, ogImage }) {
   if (!html || !html.includes('<html')) return null; // Return null if HTML is empty/invalid
-  const BASE = 'https://app.campussearch.in';
+  const BASE = 'https://campussearch.in';
   const img = ogImage || `${BASE}/og-image.png`;
   html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
   html = html.replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${description}" />`);
@@ -210,7 +210,7 @@ function sendWithMeta(res, meta) {
 // College detail page by slug: /colleges/:citySlug/:slug
 app.get('/colleges/:citySlug/:slug', async (req, res) => {
   const prisma = require('./lib/prisma');
-  const BASE = 'https://app.campussearch.in';
+  const BASE = 'https://campussearch.in';
   try {
     const college = await prisma.college.findFirst({
       where: { slug: req.params.slug, citySlug: req.params.citySlug, isActive: true },
@@ -231,7 +231,7 @@ app.get('/colleges/:citySlug/:slug', async (req, res) => {
 
 // City landing page: /colleges/:citySlug
 app.get('/colleges/:citySlug', async (req, res) => {
-  const BASE = 'https://app.campussearch.in';
+  const BASE = 'https://campussearch.in';
   const cityName = req.params.citySlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   const title = `Colleges in ${cityName} — Fees, Courses & Admission 2026-27 | Campus Search`;
   const desc = `Browse all colleges in ${cityName}. Compare fees, courses, and get free counselling. Nursing, Engineering, Medical & more.`;

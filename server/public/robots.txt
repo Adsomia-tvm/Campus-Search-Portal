@@ -5,4 +5,4 @@ Allow: /
 Disallow: /admin/
 Disallow: /api/
 
-Sitemap: https://app.campussearch.in/sitemap.xml
+Sitemap: https://campussearch.in/sitemap.xml

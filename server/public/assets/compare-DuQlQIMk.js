@@ -1,0 +1,1 @@
+import{c as s}from"./ui-BEyH5mas.js";const a=s((o,c)=>({colleges:[],addCollege:l=>o(e=>e.colleges.length<3?{colleges:[...e.colleges,l]}:e),removeCollege:l=>o(e=>({colleges:e.colleges.filter(g=>g.id!==l)})),clear:()=>o({colleges:[]}),isSelected:l=>c().colleges.some(e=>e.id===l)}));export{a as u};

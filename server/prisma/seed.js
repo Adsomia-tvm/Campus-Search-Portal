@@ -39,17 +39,34 @@ async function main() {
   const validRows = [];
   for (let i = 4; i < rows.length; i++) {
     const row = rows[i];
-    const [collegeName, courseName, category, degreeLevel, duration, quota, y1, y2, y3, y4, y5, total, hostel, notes] = row;
+    const [collegeName, courseName, category, degreeLevel, duration, quota, y1, y2, y3, y4, y5, total, hostel, notes, location, address] = row;
     if (!collegeName || typeof collegeName !== 'string') continue;
     const name = collegeName.trim();
     if (!name || name.toLowerCase().includes('college name') || name.startsWith('✅') || name.startsWith('📋')) continue;
-    if (!collegeMap.has(name.toLowerCase())) collegeMap.set(name.toLowerCase(), { name, city: extractCity(name) });
+    // City: use Location column first (col 15), fallback to extractCity from name
+    const locCity = location ? location.toString().split(',')[0].trim() : null;
+    const locState = location ? (location.toString().split(',')[1] || '').trim() : null;
+    const city = locCity || extractCity(name);
+    if (!collegeMap.has(name.toLowerCase())) {
+      collegeMap.set(name.toLowerCase(), { name, city, state: locState || null, address: address ? address.toString().trim() : null });
+    }
     validRows.push({ name, courseName, category, degreeLevel, duration, quota, y1, y2, y3, y4, y5, total, hostel, notes });
   }
 
   console.log(`🏫 Unique colleges: ${collegeMap.size}, 📚 Course rows: ${validRows.length}`);
 
-  await prisma.college.createMany({ data: Array.from(collegeMap.values()).map(c => ({ name: c.name, city: c.city, isActive: true })), skipDuplicates: true });
+  await prisma.college.createMany({ data: Array.from(collegeMap.values()).map(c => ({ name: c.name, city: c.city, state: c.state || null, address: c.address || null, isActive: true })), skipDuplicates: true });
+
+  // Update existing colleges with location/address if they were missing
+  for (const [, c] of collegeMap) {
+    if (c.city || c.address) {
+      const updateData = {};
+      if (c.city) updateData.city = c.city;
+      if (c.state) updateData.state = c.state;
+      if (c.address) updateData.address = c.address;
+      await prisma.college.updateMany({ where: { name: c.name, city: null }, data: updateData });
+    }
+  }
 
   const allColleges = await prisma.college.findMany({ select: { id: true, name: true } });
   const idMap = new Map(allColleges.map(c => [c.name.toLowerCase(), c.id]));
