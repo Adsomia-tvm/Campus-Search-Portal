@@ -1,8 +1,8 @@
 const router = require('express').Router();
 const prisma = require('../../lib/prisma');
-const { requireAuth } = require('../../middleware/auth');
+const { requireStaff } = require('../../middleware/auth');
 
-router.use(requireAuth);
+router.use(requireStaff);
 
 const VALID_TYPES = ['monthly', 'category', 'city', 'counselor'];
 

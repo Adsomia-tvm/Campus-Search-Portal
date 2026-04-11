@@ -17,8 +17,8 @@ app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "script-src 'self'; " +
+    "style-src 'self' https://fonts.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
     "img-src 'self' data: https:; " +
     "connect-src 'self' https://app.campussearch.in https://campussearch.in; " +
@@ -42,8 +42,9 @@ const ALLOWED_ORIGINS = [
 
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow server-to-server (no origin/null origin) and allowlisted origins only
-    if (!origin || origin === 'null' || ALLOWED_ORIGINS.includes(origin)) {
+    // Allow server-to-server requests (no origin header, e.g. curl, Postman, SSR)
+    // but REJECT the string "null" — that's an attacker using a sandboxed iframe
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
       cb(null, true);
     } else {
       cb(new Error(`CORS: origin ${origin} not allowed`));
@@ -92,14 +93,19 @@ app.use('/api/admin/reports',       require('./routes/admin/reports'));
 app.use('/api/admin/import',        require('./routes/admin/import'));
 app.use('/api/admin/users',         require('./routes/admin/users'));
 
-// ── Health check (with DB connectivity test) ─────────────────────────────────
+// ── Health check (safe for production — no env/db details leaked) ────────────
 app.get('/api/health', async (req, res) => {
   try {
     const prisma = require('./lib/prisma');
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'ok', db: 'connected', time: new Date().toISOString(), env: process.env.NODE_ENV });
+    const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+    res.json({
+      status: 'ok',
+      time: new Date().toISOString(),
+      ...(!isProd && { db: 'connected', env: process.env.NODE_ENV }),
+    });
   } catch (err) {
-    res.status(503).json({ status: 'error', db: 'disconnected', time: new Date().toISOString() });
+    res.status(503).json({ status: 'error', time: new Date().toISOString() });
   }
 });
 
@@ -143,11 +149,14 @@ ${allUrls.map(u => `  <url>
   }
 });
 
+// ── API 404 catch-all — return JSON for unknown API routes ──────────────────
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
 // ── SPA fallback — send index.html for all non-API routes ───────────────────
 app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(_path.join(_distPath, 'index.html'));
-  }
+  res.sendFile(_path.join(_distPath, 'index.html'));
 });
 
 // ── Centralized error handler (MUST be last middleware) ──────────────────────

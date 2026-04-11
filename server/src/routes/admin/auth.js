@@ -6,21 +6,64 @@ const { requireAuth } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { adminLogin, adminSetup } = require('../../middleware/schemas');
 
+// ── Per-account lockout (in-memory — resets on cold start, good enough for serverless) ──
+const loginAttempts = new Map(); // email → { count, lockedUntil }
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MINUTES = 15;
+
+function checkLockout(email) {
+  const record = loginAttempts.get(email);
+  if (!record) return false;
+  if (record.lockedUntil && record.lockedUntil > Date.now()) return true;
+  if (record.lockedUntil && record.lockedUntil <= Date.now()) {
+    loginAttempts.delete(email); // lockout expired
+    return false;
+  }
+  return false;
+}
+
+function recordFailedAttempt(email) {
+  const record = loginAttempts.get(email) || { count: 0, lockedUntil: null };
+  record.count += 1;
+  if (record.count >= MAX_ATTEMPTS) {
+    record.lockedUntil = Date.now() + LOCKOUT_MINUTES * 60 * 1000;
+  }
+  loginAttempts.set(email, record);
+}
+
+function clearAttempts(email) {
+  loginAttempts.delete(email);
+}
+
 // POST /api/auth/login
 router.post('/login', validate(adminLogin), async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
+    // Check account lockout
+    if (checkLockout(email)) {
+      return res.status(429).json({ error: `Account temporarily locked. Try again in ${LOCKOUT_MINUTES} minutes.` });
+    }
+
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !user.isActive) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user || !user.isActive) {
+      recordFailedAttempt(email);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!valid) {
+      recordFailedAttempt(email);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Successful login — clear any failed attempts
+    clearAttempts(email);
 
     const token = jwt.sign(
       { id: user.id, name: user.name, email: user.email, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { expiresIn: process.env.JWT_EXPIRES_IN || '4h' }
     );
 
     res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });

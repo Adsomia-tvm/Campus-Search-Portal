@@ -1,10 +1,10 @@
 const router = require('express').Router();
 const prisma = require('../../lib/prisma');
-const { requireAuth, requireAdmin } = require('../../middleware/auth');
+const { requireTeamMember, requireAdmin } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { createCollege, updateCollege, createCourse, updateCourse, idParam } = require('../../middleware/schemas');
 
-router.use(requireAuth);
+router.use(requireTeamMember);
 
 // GET /api/admin/colleges
 router.get('/', async (req, res, next) => {

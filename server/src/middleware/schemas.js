@@ -192,7 +192,7 @@ const createUser = z.object({
     name: z.string().trim().min(2).max(100),
     email: z.string().email(),
     password: z.string().min(8, 'Password must be at least 8 characters'),
-    role: z.enum(['admin', 'staff', 'consultant']),
+    role: z.enum(['staff', 'consultant']),  // admin accounts must be created via setup or DB
     phone: z.string().max(20).optional().nullable(),
     collegeIds: z.array(positiveInt).optional(),
   }),

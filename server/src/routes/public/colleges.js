@@ -8,7 +8,8 @@ router.get('/', async (req, res, next) => {
     const { city, category, degreeLevel, minFee, maxFee, search, page = 1, limit = 20, sortBy = 'name' } = req.query;
 
     const take = Math.min(Math.max(Number(limit) || 20, 1), 100);
-    const skip = (Math.max(Number(page), 1) - 1) * take;
+    const pageNum = Math.max(Math.floor(Number(page)) || 1, 1);
+    const skip = (pageNum - 1) * take;
     const trimSearch = (search || '').trim();
 
     // Cache key from all filter params
@@ -68,7 +69,7 @@ router.get('/', async (req, res, next) => {
       prisma.college.count({ where }),
     ]);
 
-    const result = { colleges, total, page: Number(page), pages: Math.ceil(total / take) };
+    const result = { colleges, total, page: pageNum, pages: Math.ceil(total / take) };
     searchCache.set(cacheKey, result);
     res.setHeader('X-Cache', 'MISS');
     res.json(result);

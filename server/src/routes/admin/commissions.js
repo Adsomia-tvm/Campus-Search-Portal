@@ -1,10 +1,10 @@
 const router = require('express').Router();
 const prisma = require('../../lib/prisma');
-const { requireAuth } = require('../../middleware/auth');
+const { requireStaff } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { createCommission, updateCommission, idParam } = require('../../middleware/schemas');
 
-router.use(requireAuth);
+router.use(requireStaff);
 
 // GET /api/admin/commissions
 router.get('/', async (req, res, next) => {
