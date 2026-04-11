@@ -181,6 +181,7 @@ function getIndexHtml() {
 
 // Helper to inject meta tags into index.html for bots
 function injectMeta(html, { title, description, canonical, ogImage }) {
+  if (!html || !html.includes('<html')) return null; // Return null if HTML is empty/invalid
   const BASE = 'https://app.campussearch.in';
   const img = ogImage || `${BASE}/og-image.png`;
   html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
@@ -193,6 +194,17 @@ function injectMeta(html, { title, description, canonical, ogImage }) {
   html = html.replace(/<meta name="twitter:title"[^>]*>/, `<meta name="twitter:title" content="${title}" />`);
   html = html.replace(/<meta name="twitter:description"[^>]*>/, `<meta name="twitter:description" content="${description}" />`);
   return html;
+}
+
+// Helper: send page with injected meta, fallback to sendFile if injection fails
+function sendWithMeta(res, meta) {
+  const html = injectMeta(getIndexHtml(), meta);
+  if (html) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  }
+  // Fallback: serve regular index.html (React client-side handles meta)
+  return res.sendFile(_path.join(_distPath, 'index.html'));
 }
 
 // College detail page by slug: /colleges/:citySlug/:slug
@@ -211,8 +223,7 @@ app.get('/colleges/:citySlug/:slug', async (req, res) => {
     const title = college.metaTitle || `${college.name} — ${feeStr || 'Courses'} & Fees 2026-27 | ${college.city || 'South India'}`;
     const desc = college.metaDescription || `${college.name}${college.city ? ` in ${college.city}` : ''} — ${cats || 'courses'} available. ${feeStr}. Compare fees, get free counselling. Updated 2026-27.`;
     const canonical = `${BASE}/colleges/${college.citySlug}/${college.slug}`;
-    const html = injectMeta(getIndexHtml(), { title: title.slice(0, 70), description: desc.slice(0, 160), canonical });
-    res.send(html);
+    sendWithMeta(res, { title: title.slice(0, 70), description: desc.slice(0, 160), canonical });
   } catch (e) {
     res.sendFile(_path.join(_distPath, 'index.html'));
   }
@@ -225,8 +236,7 @@ app.get('/colleges/:citySlug', async (req, res) => {
   const title = `Colleges in ${cityName} — Fees, Courses & Admission 2026-27 | Campus Search`;
   const desc = `Browse all colleges in ${cityName}. Compare fees, courses, and get free counselling. Nursing, Engineering, Medical & more.`;
   const canonical = `${BASE}/colleges/${req.params.citySlug}`;
-  const html = injectMeta(getIndexHtml(), { title: title.slice(0, 70), description: desc.slice(0, 160), canonical });
-  res.send(html);
+  sendWithMeta(res, { title: title.slice(0, 70), description: desc.slice(0, 160), canonical });
 });
 
 // Old college URL redirect: /college/:id -> /colleges/:citySlug/:slug (301)
