@@ -27,6 +27,9 @@ export const getRelatedColleges = (id)    => api.get(`/colleges/${id}/related`).
 export const getCollegeStats    = (id)    => api.get(`/colleges/${id}/stats`).then(r => r.data);
 export const getSuggestions = (q)    => api.get('/colleges/suggest', { params: { q } }).then(r => r.data);
 export const getCollege    = (id)     => api.get(`/colleges/${id}`).then(r => r.data);
+export const getCollegeBySlug = (citySlug, slug) => api.get(`/colleges/by-slug/${citySlug}/${slug}`).then(r => r.data);
+export const getCityColleges  = (citySlug, params) => api.get(`/colleges/city/${citySlug}`, { params }).then(r => r.data);
+export const getAllSlugs      = () => api.get('/colleges/seo/all-slugs').then(r => r.data);
 export const getCompare    = (ids)    => api.get('/colleges/compare', { params: { ids } }).then(r => r.data);
 export const getTop10      = (params) => api.get('/colleges/top10', { params }).then(r => r.data);
 export const getCities     = ()       => api.get('/colleges/cities').then(r => r.data);

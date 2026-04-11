@@ -8,24 +8,28 @@ datasource db {
 }
 
 model College {
-  id            Int       @id @default(autoincrement())
-  name          String
-  city          String?
-  state         String?
-  type          String?   // Private / Deemed / Government
-  address       String?
-  phone         String?
-  email         String?
-  website       String?
-  logoUrl       String?
-  description   String?
-  approvedBy    String?   // INC / KNC / AICTE / UGC etc.
-  accreditation String?   // NAAC grade, NBA etc.
-  minFee        Int?      // Materialized: min totalFee across active courses
-  maxFee        Int?      // Materialized: max totalFee across active courses
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              Int       @id @default(autoincrement())
+  name            String
+  city            String?
+  state           String?
+  type            String?   // Private / Deemed / Government
+  address         String?
+  phone           String?
+  email           String?
+  website         String?
+  logoUrl         String?
+  description     String?
+  approvedBy      String?   // INC / KNC / AICTE / UGC etc.
+  accreditation   String?   // NAAC grade, NBA etc.
+  minFee          Int?      // Materialized: min totalFee across active courses
+  maxFee          Int?      // Materialized: max totalFee across active courses
+  slug            String?   @unique  // SEO-friendly URL segment
+  citySlug        String?   // City portion of URL
+  metaTitle       String?   // Custom title tag override
+  metaDescription String?   // Custom meta description override
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   courses            Course[]
   enquiries          Enquiry[]
@@ -39,6 +43,8 @@ model College {
   @@index([isActive, city])
   @@index([isActive, minFee])  // fee sort index
   @@index([isActive, maxFee])  // fee sort index
+  @@index([slug])
+  @@index([citySlug])
   @@map("colleges")
 }
 

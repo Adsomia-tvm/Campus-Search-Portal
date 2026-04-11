@@ -6,6 +6,7 @@ import { useAuthStore } from './context/auth';
 const Home          = lazy(() => import('./pages/Home'));
 const Search        = lazy(() => import('./pages/Search'));
 const CollegeDetail = lazy(() => import('./pages/CollegeDetail'));
+const CityColleges  = lazy(() => import('./pages/CityColleges'));
 const Compare       = lazy(() => import('./pages/Compare'));
 const Enquiry       = lazy(() => import('./pages/Enquiry'));
 const Thanks        = lazy(() => import('./pages/Thanks'));
@@ -44,6 +45,8 @@ export default function App() {
       <Route path="/"             element={<Home />} />
       <Route path="/search"       element={<Search />} />
       <Route path="/college/:id"  element={<CollegeDetail />} />
+      <Route path="/colleges/:citySlug/:slug" element={<CollegeDetail />} />
+      <Route path="/colleges/:citySlug" element={<CityColleges />} />
       <Route path="/compare"      element={<Compare />} />
       <Route path="/enquire"      element={<Enquiry />} />
       <Route path="/thanks"       element={<Thanks />} />

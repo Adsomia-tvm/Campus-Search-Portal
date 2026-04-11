@@ -182,6 +182,85 @@ router.get('/compare', async (req, res, next) => {
   }
 });
 
+// GET /api/colleges/by-slug/:citySlug/:slug — lookup by SEO slug
+router.get('/by-slug/:citySlug/:slug', async (req, res, next) => {
+  try {
+    const { citySlug, slug } = req.params;
+    const college = await prisma.college.findFirst({
+      where: { slug, citySlug, isActive: true },
+      include: {
+        courses: { where: { isActive: true }, orderBy: [{ category: 'asc' }, { totalFee: 'asc' }] },
+        contacts: true,
+      },
+    });
+    if (!college) return res.status(404).json({ error: 'College not found' });
+    detailCache.set(`college:${college.id}`, college);
+    res.json(college);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/colleges/city/:citySlug — all colleges in a city
+router.get('/city/:citySlug', async (req, res, next) => {
+  try {
+    const { citySlug } = req.params;
+    const { category } = req.query;
+    const cacheKey = `city:${citySlug}:${category || 'all'}`;
+    const cached = searchCache.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    const where = { isActive: true, citySlug, courses: { some: { isActive: true } } };
+    if (category) where.courses = { some: { isActive: true, category: { contains: category, mode: 'insensitive' } } };
+
+    const colleges = await prisma.college.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      include: {
+        courses: {
+          where: { isActive: true },
+          orderBy: { totalFee: 'asc' },
+          take: 5,
+          select: { id: true, name: true, category: true, degreeLevel: true, totalFee: true },
+        },
+      },
+    });
+
+    const allCats = [...new Set(colleges.flatMap(c => c.courses.map(co => co.category).filter(Boolean)))].sort();
+    const result = { colleges, total: colleges.length, categories: allCats, citySlug };
+    searchCache.set(cacheKey, result);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/colleges/seo/all-slugs — returns all college slugs for sitemap/linking
+router.get('/seo/all-slugs', async (req, res, next) => {
+  try {
+    const cached = staticCache.get('all-slugs');
+    if (cached) return res.json(cached);
+
+    const colleges = await prisma.college.findMany({
+      where: { isActive: true, slug: { not: null }, citySlug: { not: null } },
+      select: { id: true, name: true, slug: true, citySlug: true, city: true, minFee: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const cities = {};
+    for (const c of colleges) {
+      if (!cities[c.citySlug]) cities[c.citySlug] = { citySlug: c.citySlug, city: c.city, colleges: [] };
+      cities[c.citySlug].colleges.push(c);
+    }
+
+    const result = { colleges, cities: Object.values(cities) };
+    staticCache.set('all-slugs', result);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/colleges/:id/related — same city + overlapping courses, excludes self
 router.get('/:id/related', async (req, res, next) => {
   try {
@@ -205,7 +284,8 @@ router.get('/:id/related', async (req, res, next) => {
       },
       take: 4,
       orderBy: { name: 'asc' },
-      include: {
+      select: {
+        id: true, name: true, city: true, slug: true, citySlug: true,
         courses: {
           where: { isActive: true },
           orderBy: { totalFee: 'asc' },
@@ -233,7 +313,6 @@ router.get('/:id/stats', async (req, res, next) => {
 
     res.json({ enquiriesThisWeek: count });
   } catch (err) {
-    // Graceful degradation for social proof — don't break the page
     res.json({ enquiriesThisWeek: 0 });
   }
 });

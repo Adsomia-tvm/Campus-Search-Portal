@@ -231,9 +231,54 @@ export default function Home() {
         </a>
       </section>
 
-      <footer className="bg-gray-900 text-gray-400 text-center py-6 text-sm">
-        <p>© 2026 Campus Search. All rights reserved.</p>
-        <p className="mt-1 text-xs text-gray-600">South India's college search portal — Nursing, Engineering, Allied Health & more.</p>
+      {/* Browse by City — SEO internal links */}
+      <section className="bg-gray-50 border-t border-gray-100 py-10 px-4">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-lg font-bold text-brand mb-4">Browse Colleges by City</h2>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { name: 'Bengaluru', slug: 'bengaluru' },
+              { name: 'Chennai', slug: 'chennai' },
+              { name: 'Salem', slug: 'salem' },
+              { name: 'Mangaluru', slug: 'mangaluru' },
+              { name: 'Coimbatore', slug: 'coimbatore' },
+              { name: 'Erode', slug: 'erode' },
+              { name: 'Mysuru', slug: 'mysuru' },
+              { name: 'Tumakuru', slug: 'tumakuru' },
+            ].map(c => (
+              <a key={c.slug} href={`/colleges/${c.slug}`}
+                className="bg-white text-gray-700 text-xs px-3 py-2 rounded-lg border border-gray-200 hover:border-brand/30 hover:text-brand transition-colors">
+                Colleges in {c.name}
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <footer className="bg-gray-900 text-gray-400 py-8 px-4">
+        <div className="max-w-5xl mx-auto grid md:grid-cols-3 gap-6 text-sm">
+          <div>
+            <p className="font-bold text-white mb-2">Campus Search</p>
+            <p className="text-xs text-gray-500">South India's college search portal — Nursing, Engineering, Allied Health & more.</p>
+          </div>
+          <div>
+            <p className="font-bold text-gray-300 mb-2">Popular Cities</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              {['bengaluru','chennai','salem','mangaluru','coimbatore','erode','mysuru'].map(s => (
+                <a key={s} href={`/colleges/${s}`} className="hover:text-white transition-colors capitalize">{s}</a>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="font-bold text-gray-300 mb-2">Links</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              <a href="/search" className="hover:text-white transition-colors">Search Colleges</a>
+              <a href="/compare" className="hover:text-white transition-colors">Compare</a>
+              <a href="/enquire" className="hover:text-white transition-colors">Free Counselling</a>
+            </div>
+          </div>
+        </div>
+        <p className="text-center text-xs text-gray-600 mt-6">© 2026 Campus Search. All rights reserved.</p>
       </footer>
     </div>
   );

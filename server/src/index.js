@@ -117,20 +117,34 @@ app.get('/sitemap.xml', async (req, res) => {
   try {
     const colleges = await prisma.college.findMany({
       where: { isActive: true },
-      select: { id: true, updatedAt: true },
+      select: { id: true, slug: true, citySlug: true, updatedAt: true },
       orderBy: { id: 'asc' },
     });
     const staticUrls = [
       { loc: `${BASE}/`,       priority: '1.0', changefreq: 'daily'   },
       { loc: `${BASE}/search`, priority: '0.9', changefreq: 'daily'   },
     ];
+
+    // College detail pages — use slug URLs where available, fall back to /college/:id
     const collegeUrls = colleges.map(c => ({
-      loc: `${BASE}/college/${c.id}`,
+      loc: c.slug && c.citySlug
+        ? `${BASE}/colleges/${c.citySlug}/${c.slug}`
+        : `${BASE}/college/${c.id}`,
       priority: '0.8',
       changefreq: 'weekly',
       lastmod: c.updatedAt?.toISOString().split('T')[0] || now,
     }));
-    const allUrls = [...staticUrls, ...collegeUrls];
+
+    // City landing pages
+    const citySlugs = [...new Set(colleges.filter(c => c.citySlug).map(c => c.citySlug))];
+    const cityUrls = citySlugs.map(cs => ({
+      loc: `${BASE}/colleges/${cs}`,
+      priority: '0.7',
+      changefreq: 'weekly',
+      lastmod: now,
+    }));
+
+    const allUrls = [...staticUrls, ...cityUrls, ...collegeUrls];
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${allUrls.map(u => `  <url>
@@ -152,6 +166,83 @@ ${allUrls.map(u => `  <url>
 // ── API 404 catch-all — return JSON for unknown API routes ──────────────────
 app.all('/api/*', (req, res) => {
   res.status(404).json({ error: 'Not found' });
+});
+
+// ── SEO: Server-side meta injection for college & city pages ────────────────
+const _fs = require('fs');
+let _indexHtml = null;
+function getIndexHtml() {
+  if (!_indexHtml) {
+    try { _indexHtml = _fs.readFileSync(_path.join(_distPath, 'index.html'), 'utf8'); }
+    catch { _indexHtml = ''; }
+  }
+  return _indexHtml;
+}
+
+// Helper to inject meta tags into index.html for bots
+function injectMeta(html, { title, description, canonical, ogImage }) {
+  const BASE = 'https://app.campussearch.in';
+  const img = ogImage || `${BASE}/og-image.png`;
+  html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
+  html = html.replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${description}" />`);
+  html = html.replace(/<link rel="canonical"[^>]*>/, `<link rel="canonical" href="${canonical}" />`);
+  html = html.replace(/<meta property="og:title"[^>]*>/, `<meta property="og:title" content="${title}" />`);
+  html = html.replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${description}" />`);
+  html = html.replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${canonical}" />`);
+  html = html.replace(/<meta property="og:image" content="[^"]*"/, `<meta property="og:image" content="${img}"`);
+  html = html.replace(/<meta name="twitter:title"[^>]*>/, `<meta name="twitter:title" content="${title}" />`);
+  html = html.replace(/<meta name="twitter:description"[^>]*>/, `<meta name="twitter:description" content="${description}" />`);
+  return html;
+}
+
+// College detail page by slug: /colleges/:citySlug/:slug
+app.get('/colleges/:citySlug/:slug', async (req, res) => {
+  const prisma = require('./lib/prisma');
+  const BASE = 'https://app.campussearch.in';
+  try {
+    const college = await prisma.college.findFirst({
+      where: { slug: req.params.slug, citySlug: req.params.citySlug, isActive: true },
+      select: { id: true, name: true, city: true, state: true, minFee: true, maxFee: true, slug: true, citySlug: true, metaTitle: true, metaDescription: true,
+        courses: { where: { isActive: true }, select: { category: true }, take: 5 } },
+    });
+    if (!college) return res.sendFile(_path.join(_distPath, 'index.html'));
+    const cats = [...new Set(college.courses.map(c => c.category).filter(Boolean))].slice(0, 3).join(', ');
+    const feeStr = college.minFee ? `Fees from ₹${college.minFee.toLocaleString('en-IN')}` : '';
+    const title = college.metaTitle || `${college.name} — ${feeStr || 'Courses'} & Fees 2026-27 | ${college.city || 'South India'}`;
+    const desc = college.metaDescription || `${college.name}${college.city ? ` in ${college.city}` : ''} — ${cats || 'courses'} available. ${feeStr}. Compare fees, get free counselling. Updated 2026-27.`;
+    const canonical = `${BASE}/colleges/${college.citySlug}/${college.slug}`;
+    const html = injectMeta(getIndexHtml(), { title: title.slice(0, 70), description: desc.slice(0, 160), canonical });
+    res.send(html);
+  } catch (e) {
+    res.sendFile(_path.join(_distPath, 'index.html'));
+  }
+});
+
+// City landing page: /colleges/:citySlug
+app.get('/colleges/:citySlug', async (req, res) => {
+  const BASE = 'https://app.campussearch.in';
+  const cityName = req.params.citySlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  const title = `Colleges in ${cityName} — Fees, Courses & Admission 2026-27 | Campus Search`;
+  const desc = `Browse all colleges in ${cityName}. Compare fees, courses, and get free counselling. Nursing, Engineering, Medical & more.`;
+  const canonical = `${BASE}/colleges/${req.params.citySlug}`;
+  const html = injectMeta(getIndexHtml(), { title: title.slice(0, 70), description: desc.slice(0, 160), canonical });
+  res.send(html);
+});
+
+// Old college URL redirect: /college/:id -> /colleges/:citySlug/:slug (301)
+app.get('/college/:id', async (req, res) => {
+  const prisma = require('./lib/prisma');
+  try {
+    const id = Number(req.params.id);
+    if (id) {
+      const college = await prisma.college.findUnique({ where: { id }, select: { slug: true, citySlug: true } });
+      if (college?.slug && college?.citySlug) {
+        return res.redirect(301, `/colleges/${college.citySlug}/${college.slug}`);
+      }
+    }
+  } catch {}
+  // Fallback — serve SPA for colleges without slugs yet
+  res.sendFile(_path.join(_distPath, 'index.html'));
 });
 
 // ── SPA fallback — send index.html for all non-API routes ───────────────────

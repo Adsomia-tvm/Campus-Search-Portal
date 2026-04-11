@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '../components/Navbar';
 import FeeTable from '../components/FeeTable';
-import { getCollege, getRelatedColleges, getCollegeStats } from '../api';
+import { getCollege, getCollegeBySlug, getRelatedColleges, getCollegeStats } from '../api';
 import usePageTitle from '../hooks/usePageTitle';
 import useJsonLd from '../hooks/useJsonLd';
 
@@ -40,14 +40,17 @@ function buildSchema(college, faqItems) {
   });
 
   // BreadcrumbList
-  schemas.push({
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home',    item: window.location.origin },
-      { '@type': 'ListItem', position: 2, name: 'Search',  item: `${window.location.origin}/search` },
-      { '@type': 'ListItem', position: 3, name: college.name, item: window.location.href },
-    ],
-  });
+  const breadcrumbs = [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: window.location.origin },
+  ];
+  if (college.citySlug && college.city) {
+    breadcrumbs.push({ '@type': 'ListItem', position: 2, name: `Colleges in ${college.city}`, item: `${window.location.origin}/colleges/${college.citySlug}` });
+    breadcrumbs.push({ '@type': 'ListItem', position: 3, name: college.name, item: window.location.href });
+  } else {
+    breadcrumbs.push({ '@type': 'ListItem', position: 2, name: 'Search', item: `${window.location.origin}/search` });
+    breadcrumbs.push({ '@type': 'ListItem', position: 3, name: college.name, item: window.location.href });
+  }
+  schemas.push({ '@type': 'BreadcrumbList', itemListElement: breadcrumbs });
 
   // FAQPage
   if (faqItems.length) {
@@ -118,14 +121,61 @@ function FaqAccordion({ faqs }) {
   );
 }
 
+/** Hook to set dynamic <link rel="canonical"> and <meta property="og:*"> tags */
+function useSeoMeta(college) {
+  useEffect(() => {
+    if (!college) return;
+    const BASE = window.location.origin;
+    const canonical = college.slug && college.citySlug
+      ? `${BASE}/colleges/${college.citySlug}/${college.slug}`
+      : `${BASE}/college/${college.id}`;
+
+    const cats = [...new Set((college.courses || []).map(c => c.category).filter(Boolean))].slice(0, 3).join(', ');
+    const feeStr = college.minFee ? `Fees from ₹${college.minFee.toLocaleString('en-IN')}` : '';
+    const desc = `${college.name}${college.city ? ` in ${college.city}` : ''} — ${cats || 'courses'} available. ${feeStr}. Compare fees, get free counselling.`;
+
+    // Update canonical
+    let link = document.querySelector('link[rel="canonical"]');
+    if (link) link.href = canonical;
+
+    // Update meta description
+    let meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.content = desc.slice(0, 160);
+
+    // Update OG tags
+    const ogUpdates = { 'og:url': canonical, 'og:title': document.title, 'og:description': desc.slice(0, 160) };
+    for (const [prop, val] of Object.entries(ogUpdates)) {
+      let tag = document.querySelector(`meta[property="${prop}"]`);
+      if (tag) tag.content = val;
+    }
+
+    return () => {
+      // Reset canonical on unmount
+      if (link) link.href = BASE + '/';
+    };
+  }, [college]);
+}
+
 export default function CollegeDetail() {
-  const { id } = useParams();
+  const { id, citySlug, slug } = useParams();
+  const navigate = useNavigate();
+
+  // Support both /college/:id and /colleges/:citySlug/:slug
   const { data: college, isLoading, isError } = useQuery({
-    queryKey: ['college', id],
-    queryFn: () => getCollege(id),
+    queryKey: slug ? ['college-slug', citySlug, slug] : ['college', id],
+    queryFn: () => slug ? getCollegeBySlug(citySlug, slug) : getCollege(id),
   });
 
-  usePageTitle(college?.name || 'College Details');
+  // If loaded by ID and college has a slug, redirect to SEO URL
+  useEffect(() => {
+    if (id && college?.slug && college?.citySlug) {
+      navigate(`/colleges/${college.citySlug}/${college.slug}`, { replace: true });
+    }
+  }, [id, college, navigate]);
+
+  const feeStr = college?.minFee ? `Fees from ₹${college.minFee.toLocaleString('en-IN')}` : '';
+  usePageTitle(college ? `${college.name} — ${feeStr || 'Courses'} & Fees 2026-27` : 'College Details');
+  useSeoMeta(college);
 
   const { data: related } = useQuery({
     queryKey: ['related', id],
@@ -169,8 +219,17 @@ export default function CollegeDetail() {
           <p className="text-blue-200 text-sm mb-3">
             <Link to="/" className="hover:underline">Home</Link>
             <span className="mx-2">›</span>
-            <Link to="/search" className="hover:underline">Search</Link>
-            <span className="mx-2">›</span>
+            {college.citySlug && college.city ? (
+              <>
+                <Link to={`/colleges/${college.citySlug}`} className="hover:underline">Colleges in {college.city}</Link>
+                <span className="mx-2">›</span>
+              </>
+            ) : (
+              <>
+                <Link to="/search" className="hover:underline">Search</Link>
+                <span className="mx-2">›</span>
+              </>
+            )}
             <span>{college.name}</span>
           </p>
           <h1 className="text-2xl md:text-3xl font-extrabold mb-3 leading-snug">{college.name}</h1>
@@ -300,8 +359,9 @@ export default function CollegeDetail() {
             <div className="grid sm:grid-cols-2 gap-3">
               {related.map(r => {
                 const rMin = r.courses?.reduce((m, c) => c.totalFee && c.totalFee < m ? c.totalFee : m, Infinity);
+                const rUrl = r.slug && r.citySlug ? `/colleges/${r.citySlug}/${r.slug}` : `/college/${r.id}`;
                 return (
-                  <Link key={r.id} to={`/college/${r.id}`}
+                  <Link key={r.id} to={rUrl}
                     className="bg-white rounded-xl p-4 border border-gray-100 hover:border-brand/30 hover:shadow-sm transition-all block">
                     <p className="font-semibold text-brand text-sm leading-snug mb-1">{r.name}</p>
                     <p className="text-xs text-gray-500 mb-2">📍 {r.city || 'South India'}</p>
