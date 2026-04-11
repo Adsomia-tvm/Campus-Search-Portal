@@ -92,8 +92,16 @@ app.use('/api/admin/reports',       require('./routes/admin/reports'));
 app.use('/api/admin/import',        require('./routes/admin/import'));
 app.use('/api/admin/users',         require('./routes/admin/users'));
 
-// ── Health check ──────────────────────────────────────────────────────────────
-app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date(), env: process.env.NODE_ENV }));
+// ── Health check (with DB connectivity test) ─────────────────────────────────
+app.get('/api/health', async (req, res) => {
+  try {
+    const prisma = require('./lib/prisma');
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'ok', db: 'connected', time: new Date().toISOString(), env: process.env.NODE_ENV });
+  } catch (err) {
+    res.status(503).json({ status: 'error', db: 'disconnected', time: new Date().toISOString() });
+  }
+});
 
 // ── Dynamic sitemap.xml — includes every active college URL ──────────────────
 app.get('/sitemap.xml', async (req, res) => {
@@ -142,11 +150,9 @@ app.get('*', (req, res) => {
   }
 });
 
-// ── Error handler ─────────────────────────────────────────────────────────────
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
-});
+// ── Centralized error handler (MUST be last middleware) ──────────────────────
+const errorHandler = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 // ── Start server (local only — Vercel handles this in serverless mode) ────────
 if (require.main === module) {

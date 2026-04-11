@@ -1,15 +1,17 @@
 const router = require('express').Router();
 const prisma = require('../../lib/prisma');
 const { requireTeamMember } = require('../../middleware/auth');
+const validate = require('../../middleware/validate');
+const { createEnquiry, updateEnquiry, idParam } = require('../../middleware/schemas');
 
 router.use(requireTeamMember);
 
-const STATUSES = ['New','Contacted','Visited','Applied','Enrolled','Dropped'];
+const STATUSES = ['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped'];
 
 // GET /api/admin/enquiries
 // - admin/staff: see all
 // - consultant: see only enquiries for their assigned colleges
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
     const { status, counselorId, search, page = 1, limit = 30 } = req.query;
     const where = {};
@@ -21,7 +23,9 @@ router.get('/', async (req, res) => {
         select: { collegeId: true },
       });
       const collegeIds = assigned.map(r => r.collegeId);
-      if (!collegeIds.length) return res.json({ enquiries: [], total: 0, page: 1, pages: 0, statusCounts: [] });
+      if (!collegeIds.length) {
+        return res.json({ enquiries: [], total: 0, page: 1, pages: 0, statusCounts: [] });
+      }
       where.collegeId = { in: collegeIds };
     }
 
@@ -33,10 +37,13 @@ router.get('/', async (req, res) => {
       { college: { name:  { contains: search, mode: 'insensitive' } } },
     ];
 
-    const skip = (Number(page) - 1) * Number(limit);
-    const [enquiries, total, counts] = await Promise.all([
+    const take = Math.min(Math.max(Number(limit) || 30, 1), 100);
+    const skip = (Math.max(Number(page), 1) - 1) * take;
+
+    // ── N+1 FIX: single groupBy instead of 6 separate COUNT queries ──────────
+    const [enquiries, total, statusGroups] = await Promise.all([
       prisma.enquiry.findMany({
-        where, skip, take: Number(limit), orderBy: { createdAt: 'desc' },
+        where, skip, take, orderBy: { createdAt: 'desc' },
         include: {
           student:   { select: { id: true, name: true, phone: true, preferredCat: true } },
           college:   { select: { id: true, name: true, city: true } },
@@ -45,36 +52,48 @@ router.get('/', async (req, res) => {
         },
       }),
       prisma.enquiry.count({ where }),
-      Promise.all(STATUSES.map(s =>
-        prisma.enquiry.count({ where: { ...where, status: s } })
-          .then(c => ({ status: s, count: c }))
-      )),
+      prisma.enquiry.groupBy({
+        by: ['status'],
+        where,
+        _count: { id: true },
+      }),
     ]);
 
-    res.json({ enquiries, total, page: Number(page), pages: Math.ceil(total / Number(limit)), statusCounts: counts });
+    // Map groupBy result to the same shape the frontend expects
+    const countMap = Object.fromEntries(statusGroups.map(g => [g.status, g._count.id]));
+    const statusCounts = STATUSES.map(s => ({ status: s, count: countMap[s] || 0 }));
+
+    res.json({ enquiries, total, page: Number(page), pages: Math.ceil(total / take), statusCounts });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // Whitelist allowed fields to prevent mass assignment
 function pickEnquiryCreate(body) {
-  const { studentId, collegeId, courseId, status, counselorId, notes } = body;
-  return { studentId: Number(studentId), collegeId: Number(collegeId),
-           courseId: courseId ? Number(courseId) : null,
-           status: status || 'New', counselorId: counselorId ? Number(counselorId) : null, notes };
+  return {
+    studentId:   Number(body.studentId),
+    collegeId:   Number(body.collegeId),
+    courseId:     body.courseId ? Number(body.courseId) : null,
+    status:      body.status || 'New',
+    counselorId: body.counselorId ? Number(body.counselorId) : null,
+    notes:       body.notes || null,
+  };
 }
+
 function pickEnquiryUpdate(body) {
-  const allowed = ['status','counselorId','followUpDate','notes'];
+  const allowed = ['status', 'counselorId', 'followUpDate', 'notes'];
   const data = {};
   for (const key of allowed) {
-    if (body[key] !== undefined) data[key] = key === 'counselorId' ? Number(body[key]) : body[key];
+    if (body[key] !== undefined) {
+      data[key] = key === 'counselorId' ? (body[key] ? Number(body[key]) : null) : body[key];
+    }
   }
   return data;
 }
 
 // POST /api/admin/enquiries
-router.post('/', async (req, res) => {
+router.post('/', validate(createEnquiry), async (req, res, next) => {
   try {
     const enquiry = await prisma.enquiry.create({
       data: pickEnquiryCreate(req.body),
@@ -82,17 +101,20 @@ router.post('/', async (req, res) => {
     });
     res.status(201).json(enquiry);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // PUT /api/admin/enquiries/:id — update status, notes, follow-up
-router.put('/:id', async (req, res) => {
+router.put('/:id', validate(updateEnquiry), async (req, res, next) => {
   try {
     const enquiry = await prisma.enquiry.update({
       where: { id: Number(req.params.id) },
       data: pickEnquiryUpdate(req.body),
-      include: { student: { select: { name: true, phone: true } }, college: { select: { name: true } } },
+      include: {
+        student: { select: { name: true, phone: true } },
+        college: { select: { name: true } },
+      },
     });
 
     // Auto-create commission record when enrolled
@@ -106,7 +128,7 @@ router.put('/:id', async (req, res) => {
 
     res.json(enquiry);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 

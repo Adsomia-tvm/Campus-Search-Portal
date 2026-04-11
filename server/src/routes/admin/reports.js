@@ -4,13 +4,18 @@ const { requireAuth } = require('../../middleware/auth');
 
 router.use(requireAuth);
 
+const VALID_TYPES = ['monthly', 'category', 'city', 'counselor'];
+
 // GET /api/admin/reports?type=monthly|category|city|counselor
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
     const { type = 'monthly' } = req.query;
 
+    if (!VALID_TYPES.includes(type)) {
+      return res.status(400).json({ error: `Invalid report type. Use: ${VALID_TYPES.join(', ')}` });
+    }
+
     if (type === 'monthly') {
-      // Enquiries per month (last 12 months)
       const rows = await prisma.$queryRaw`
         SELECT DATE_TRUNC('month', "created_at") AS month,
                COUNT(*)::int AS enquiries,
@@ -55,10 +60,8 @@ router.get('/', async (req, res) => {
         GROUP BY u.name ORDER BY enrolled DESC`;
       return res.json(rows);
     }
-
-    res.status(400).json({ error: 'Invalid report type' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

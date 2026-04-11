@@ -21,6 +21,8 @@ model College {
   description   String?
   approvedBy    String?   // INC / KNC / AICTE / UGC etc.
   accreditation String?   // NAAC grade, NBA etc.
+  minFee        Int?      // Materialized: min totalFee across active courses
+  maxFee        Int?      // Materialized: max totalFee across active courses
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -35,6 +37,8 @@ model College {
   @@index([city])
   @@index([isActive])
   @@index([isActive, city])
+  @@index([isActive, minFee])  // fee sort index
+  @@index([isActive, maxFee])  // fee sort index
   @@map("colleges")
 }
 
@@ -64,6 +68,8 @@ model Course {
   @@index([collegeId])
   @@index([category])
   @@index([isActive, category])
+  @@index([isActive, totalFee])            // fee filter queries
+  @@index([collegeId, isActive, totalFee]) // college detail fee sort
   @@map("courses")
 }
 
@@ -89,6 +95,8 @@ model Student {
 
   @@index([counselorId])
   @@index([source])
+  @@index([phone])    // phone lookups for upsert
+  @@index([createdAt]) // student list default sort
   @@map("students")
 }
 
@@ -110,11 +118,15 @@ model Enquiry {
   counselor  User?       @relation(fields: [counselorId], references: [id])
   commission Commission?
 
+  @@unique([studentId, collegeId]) // Prevent duplicate enquiries per student-college pair
   @@index([studentId])
   @@index([collegeId])
   @@index([status])
   @@index([counselorId])
   @@index([createdAt])
+  @@index([collegeId, status])      // dashboard: status counts scoped to colleges
+  @@index([collegeId, createdAt])   // dashboard: recent enquiries per college
+  @@index([followUpDate])           // dashboard: upcoming follow-ups
   @@map("enquiries")
 }
 
@@ -132,6 +144,8 @@ model Commission {
   enquiry Enquiry @relation(fields: [enquiryId], references: [id])
   college College @relation(fields: [collegeId], references: [id])
 
+  @@index([status])            // commission filter by status
+  @@index([collegeId, status]) // dashboard aggregate
   @@map("commissions")
 }
 
@@ -176,5 +190,6 @@ model CollegeContact {
 
   college College @relation(fields: [collegeId], references: [id])
 
+  @@index([collegeId]) // contact lookups
   @@map("college_contacts")
 }

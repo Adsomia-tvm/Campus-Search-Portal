@@ -2,8 +2,8 @@ const router = require('express').Router();
 const prisma = require('../../lib/prisma');
 const { searchCache, staticCache, detailCache } = require('../../cache');
 
-// GET /api/colleges — search & filter
-router.get('/', async (req, res) => {
+// GET /api/colleges — search & filter (uses minFee/maxFee materialized columns for sort)
+router.get('/', async (req, res, next) => {
   try {
     const { city, category, degreeLevel, minFee, maxFee, search, page = 1, limit = 20, sortBy = 'name' } = req.query;
 
@@ -25,9 +25,13 @@ router.get('/', async (req, res) => {
     const courseFilter = { isActive: true };
     if (category)    courseFilter.category    = { contains: category.trim(),    mode: 'insensitive' };
     if (degreeLevel) courseFilter.degreeLevel = { contains: degreeLevel.trim(), mode: 'insensitive' };
-    if (minFee && Number(minFee) > 0) courseFilter.totalFee = { ...(courseFilter.totalFee||{}), gte: Number(minFee) };
-    if (maxFee && Number(maxFee) > 0) courseFilter.totalFee = { ...(courseFilter.totalFee||{}), lte: Number(maxFee) };
+    if (minFee && Number(minFee) > 0) courseFilter.totalFee = { ...(courseFilter.totalFee || {}), gte: Number(minFee) };
+    if (maxFee && Number(maxFee) > 0) courseFilter.totalFee = { ...(courseFilter.totalFee || {}), lte: Number(maxFee) };
     const hasCourseFilter = !!(category || degreeLevel || minFee || maxFee);
+
+    // Fee-range filter on the materialized columns
+    if (minFee && Number(minFee) > 0) where.maxFee = { gte: Number(minFee) };
+    if (maxFee && Number(maxFee) > 0) where.minFee = { lte: Number(maxFee) };
 
     if (trimSearch) {
       where.OR = [
@@ -41,15 +45,17 @@ router.get('/', async (req, res) => {
       where.courses = { some: { isActive: true } };
     }
 
-    // Sort mapping
-    const orderBy = sortBy === 'fee_asc' || sortBy === 'fee_desc'
-      ? [{ name: 'asc' }]  // will re-sort in-memory after fee calculation
-      : [{ name: 'asc' }];
+    // ── FIX: use materialized minFee column for DB-level fee sorting ─────────
+    let orderBy;
+    switch (sortBy) {
+      case 'fee_asc':  orderBy = [{ minFee: { sort: 'asc',  nulls: 'last' } }, { name: 'asc' }]; break;
+      case 'fee_desc': orderBy = [{ maxFee: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }]; break;
+      default:         orderBy = [{ name: 'asc' }];
+    }
 
     const [colleges, total] = await Promise.all([
       prisma.college.findMany({
-        where, skip, take,
-        orderBy,
+        where, skip, take, orderBy,
         include: {
           courses: {
             where: { isActive: true },
@@ -62,29 +68,17 @@ router.get('/', async (req, res) => {
       prisma.college.count({ where }),
     ]);
 
-    // Re-sort by min fee if requested
-    let sorted = colleges;
-    if (sortBy === 'fee_asc' || sortBy === 'fee_desc') {
-      sorted = [...colleges].sort((a, b) => {
-        const minA = Math.min(...(a.courses.map(c => c.totalFee).filter(Boolean)), Infinity);
-        const minB = Math.min(...(b.courses.map(c => c.totalFee).filter(Boolean)), Infinity);
-        const diff = (minA === Infinity ? 999999999 : minA) - (minB === Infinity ? 999999999 : minB);
-        return sortBy === 'fee_asc' ? diff : -diff;
-      });
-    }
-
-    const result = { colleges: sorted, total, page: Number(page), pages: Math.ceil(total / take) };
+    const result = { colleges, total, page: Number(page), pages: Math.ceil(total / take) };
     searchCache.set(cacheKey, result);
     res.setHeader('X-Cache', 'MISS');
     res.json(result);
   } catch (err) {
-    console.error('[colleges]', err.message);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/colleges/suggest?q=xxx — autocomplete suggestions
-router.get('/suggest', async (req, res) => {
+router.get('/suggest', async (req, res, next) => {
   try {
     const q = (req.query.q || '').trim();
     if (!q || q.length < 2) return res.json([]);
@@ -116,12 +110,12 @@ router.get('/suggest', async (req, res) => {
     searchCache.set(cacheKey, suggestions);
     res.json(suggestions);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/colleges/top10
-router.get('/top10', async (req, res) => {
+router.get('/top10', async (req, res, next) => {
   try {
     const { city, category } = req.query;
     const cacheKey = staticCache.key({ route: 'top10', city, category });
@@ -141,12 +135,12 @@ router.get('/top10', async (req, res) => {
     staticCache.set(cacheKey, courses);
     res.json(courses);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/colleges/cities
-router.get('/cities', async (req, res) => {
+router.get('/cities', async (req, res, next) => {
   try {
     const cached = staticCache.get('cities');
     if (cached) return res.json(cached);
@@ -161,12 +155,12 @@ router.get('/cities', async (req, res) => {
     staticCache.set('cities', result);
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/colleges/compare?ids=1,2,3
-router.get('/compare', async (req, res) => {
+router.get('/compare', async (req, res, next) => {
   try {
     const ids = (req.query.ids || '').split(',').map(Number).filter(Boolean).slice(0, 3);
     if (!ids.length) return res.status(400).json({ error: 'Provide college ids' });
@@ -176,12 +170,12 @@ router.get('/compare', async (req, res) => {
     });
     res.json(colleges);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/colleges/:id/related — same city + overlapping courses, excludes self
-router.get('/:id/related', async (req, res) => {
+router.get('/:id/related', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid id' });
@@ -214,13 +208,12 @@ router.get('/:id/related', async (req, res) => {
     });
     res.json(related);
   } catch (err) {
-    console.error('[related]', err.message);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/colleges/:id/stats — enquiry count last 7 days (social proof)
-router.get('/:id/stats', async (req, res) => {
+router.get('/:id/stats', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid id' });
@@ -232,12 +225,13 @@ router.get('/:id/stats', async (req, res) => {
 
     res.json({ enquiriesThisWeek: count });
   } catch (err) {
-    res.status(500).json({ enquiriesThisWeek: 3 });
+    // Graceful degradation for social proof — don't break the page
+    res.json({ enquiriesThisWeek: 0 });
   }
 });
 
 // GET /api/colleges/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid id' });
@@ -256,7 +250,7 @@ router.get('/:id', async (req, res) => {
     detailCache.set(`college:${id}`, college);
     res.json(college);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

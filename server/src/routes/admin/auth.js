@@ -3,12 +3,13 @@ const prisma = require('../../lib/prisma');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { requireAuth } = require('../../middleware/auth');
+const validate = require('../../middleware/validate');
+const { adminLogin, adminSetup } = require('../../middleware/schemas');
 
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', validate(adminLogin), async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !user.isActive) return res.status(401).json({ error: 'Invalid credentials' });
@@ -24,7 +25,7 @@ router.post('/login', async (req, res) => {
 
     res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -32,7 +33,7 @@ router.post('/login', async (req, res) => {
 router.get('/me', requireAuth, (req, res) => res.json(req.user));
 
 // POST /api/auth/setup — create first admin (only if no users exist)
-router.post('/setup', async (req, res) => {
+router.post('/setup', validate(adminSetup), async (req, res, next) => {
   try {
     const count = await prisma.user.count();
     if (count > 0) return res.status(400).json({ error: 'Setup already done' });
@@ -42,7 +43,7 @@ router.post('/setup', async (req, res) => {
     const user = await prisma.user.create({ data: { name, email, passwordHash, role: 'admin' } });
     res.json({ message: 'Admin created', userId: user.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

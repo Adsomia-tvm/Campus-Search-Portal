@@ -1,15 +1,16 @@
 const router = require('express').Router();
 const prisma = require('../../lib/prisma');
 const nodemailer = require('nodemailer');
+const validate = require('../../middleware/validate');
+const { careerLead } = require('../../middleware/schemas');
 
 // POST /api/career-leads — Career Clarity form submission from campussearch.in
-router.post('/', async (req, res) => {
+router.post('/', validate(careerLead), async (req, res, next) => {
   try {
-    const { name, phone, email, stage, stream, topCareer, allMatches } = req.body;
+    const { name: rawName, phone, email, stage, stream, topCareer, allMatches } = req.body;
 
-    if (!name || !phone) {
-      return res.status(400).json({ error: 'Name and phone are required' });
-    }
+    // Sanitize user input before storing
+    const name = rawName.replace(/<[^>]*>/g, '').trim().slice(0, 100);
 
     const notes = [
       topCareer ? `Top Career Match: ${topCareer}` : null,
@@ -42,8 +43,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({ success: true, studentId: student.id });
   } catch (err) {
-    console.error('[CareerLead]', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -57,7 +57,7 @@ async function sendNotification({ student, topCareer, allMatches, stage, stream 
   await transporter.sendMail({
     from: `"Campus Search" <${process.env.SMTP_USER}>`,
     to: process.env.NOTIFY_EMAIL,
-    subject: `🎯 Career Clarity Lead — ${student.name} (${topCareer || 'Unknown'})`,
+    subject: `Career Clarity Lead — ${student.name} (${topCareer || 'Unknown'})`,
     html: `
       <h2 style="color:#E8593C">New Career Clarity Lead</h2>
       <table style="border-collapse:collapse;width:100%;max-width:500px">
@@ -72,7 +72,7 @@ async function sendNotification({ student, topCareer, allMatches, stage, stream 
       <p style="margin-top:16px">
         <a href="${process.env.CLIENT_URL || 'https://app.campussearch.in'}/admin/students"
            style="background:#E8593C;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold">
-          View in Admin Panel →
+          View in Admin Panel
         </a>
       </p>
     `,

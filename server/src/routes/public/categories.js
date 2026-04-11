@@ -3,7 +3,7 @@ const prisma = require('../../lib/prisma');
 const { staticCache } = require('../../cache');
 
 // GET /api/categories
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
     const cached = staticCache.get('categories');
     if (cached) return res.json(cached);
@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
     staticCache.set('categories', result);
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

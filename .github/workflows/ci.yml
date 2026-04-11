@@ -1,0 +1,89 @@
+name: CI — Campus Search Server
+
+on:
+  push:
+    branches: [main, develop]
+    paths: ['server/**']
+  pull_request:
+    branches: [main]
+    paths: ['server/**']
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: campus_search_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/campus_search_test
+      JWT_SECRET: ci-test-jwt-secret-campus-search
+      STUDENT_JWT_SECRET: ci-test-student-jwt-secret
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Generate Prisma Client
+        working-directory: server
+        run: npx prisma generate
+
+      - name: Push schema to test DB
+        working-directory: server
+        run: npx prisma db push --skip-generate
+
+      - name: Run ESLint
+        working-directory: server
+        run: npm run lint
+
+      - name: Check Prettier formatting
+        working-directory: server
+        run: npm run format:check
+
+      - name: Run tests
+        working-directory: server
+        run: npm test
+
+  build-client:
+    name: Build Client
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Build
+        working-directory: client
+        run: npm run build

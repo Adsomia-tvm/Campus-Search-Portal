@@ -1,11 +1,13 @@
 const router = require('express').Router();
 const prisma = require('../../lib/prisma');
 const { requireAuth } = require('../../middleware/auth');
+const validate = require('../../middleware/validate');
+const { createStudent, updateStudent, idParam } = require('../../middleware/schemas');
 
 router.use(requireAuth);
 
 // GET /api/admin/students
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
     const { search, source, page = 1, limit = 30 } = req.query;
     const where = {};
@@ -16,22 +18,26 @@ router.get('/', async (req, res) => {
     ];
     if (source) where.source = source;
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const take = Math.min(Math.max(Number(limit) || 30, 1), 100);
+    const skip = (Math.max(Number(page), 1) - 1) * take;
+
     const [students, total] = await Promise.all([
-      prisma.student.findMany({ where, skip, take: Number(limit), orderBy: { createdAt: 'desc' },
-        include: { _count: { select: { enquiries: true } } } }),
+      prisma.student.findMany({
+        where, skip, take, orderBy: { createdAt: 'desc' },
+        include: { _count: { select: { enquiries: true } } },
+      }),
       prisma.student.count({ where }),
     ]);
-    res.json({ students, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+    res.json({ students, total, page: Number(page), pages: Math.ceil(total / take) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // Whitelist allowed fields
 function pickStudentFields(body) {
-  const allowed = ['name','phone','email','city','preferredCat','preferredCity',
-                    'budgetMax','percentage','stream','source','counselorId','notes'];
+  const allowed = ['name', 'phone', 'email', 'city', 'preferredCat', 'preferredCity',
+                    'budgetMax', 'percentage', 'stream', 'source', 'counselorId', 'notes'];
   const data = {};
   for (const key of allowed) {
     if (body[key] !== undefined) data[key] = body[key];
@@ -40,36 +46,47 @@ function pickStudentFields(body) {
 }
 
 // POST /api/admin/students
-router.post('/', async (req, res) => {
+router.post('/', validate(createStudent), async (req, res, next) => {
   try {
     const student = await prisma.student.create({ data: pickStudentFields(req.body) });
     res.status(201).json(student);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/admin/students/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', validate(idParam), async (req, res, next) => {
   try {
     const student = await prisma.student.findUnique({
       where: { id: Number(req.params.id) },
-      include: { enquiries: { include: { college: { select: { name: true, city: true } }, course: { select: { name: true } } }, orderBy: { createdAt: 'desc' } } },
+      include: {
+        enquiries: {
+          include: {
+            college: { select: { name: true, city: true } },
+            course:  { select: { name: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
     });
-    if (!student) return res.status(404).json({ error: 'Not found' });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
     res.json(student);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // PUT /api/admin/students/:id
-router.put('/:id', async (req, res) => {
+router.put('/:id', validate(updateStudent), async (req, res, next) => {
   try {
-    const student = await prisma.student.update({ where: { id: Number(req.params.id) }, data: pickStudentFields(req.body) });
+    const student = await prisma.student.update({
+      where: { id: Number(req.params.id) },
+      data: pickStudentFields(req.body),
+    });
     res.json(student);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 

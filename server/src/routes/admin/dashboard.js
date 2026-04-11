@@ -7,11 +7,11 @@ router.use(requireTeamMember);
 // GET /api/admin/dashboard
 // - admin/staff: global stats
 // - consultant: scoped to their assigned colleges
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
-    const today = new Date();
-    const startOfDay   = new Date(today.setHours(0,0,0,0));
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const now = new Date();
+    const startOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     // Build scope filter for consultants
     let collegeScope = {};
@@ -21,10 +21,10 @@ router.get('/', async (req, res) => {
       });
       const ids = assigned.map(r => r.collegeId);
       if (!ids.length) return res.json({
-        stats: { totalStudents:0, totalEnquiries:0, totalColleges:0, totalCourses:0,
-                 newToday:0, enrolledTotal:0, enrolledMonth:0,
-                 commissionPending:0, commissionReceivedMonth:0 },
-        recentEnquiries: [], followUps: [], assignedColleges: [],
+        stats: { totalStudents: 0, totalEnquiries: 0, totalColleges: 0, totalCourses: 0,
+                 newToday: 0, enrolledTotal: 0, enrolledMonth: 0,
+                 commissionPending: 0, commissionReceivedMonth: 0 },
+        recentEnquiries: [], followUps: [], userRole: req.user.role,
       });
       collegeScope = { collegeId: { in: ids } };
     }
@@ -42,7 +42,7 @@ router.get('/', async (req, res) => {
       req.user.role === 'consultant'
         ? prisma.consultantCollege.count({ where: { userId: req.user.id } })
         : prisma.college.count({ where: { isActive: true } }),
-      prisma.course.count({ where: { isActive: true, ...( collegeScope.collegeId ? { collegeId: collegeScope.collegeId } : {}) } }),
+      prisma.course.count({ where: { isActive: true, ...(collegeScope.collegeId ? { collegeId: collegeScope.collegeId } : {}) } }),
       prisma.enquiry.count({ where: { ...collegeScope, createdAt: { gte: startOfDay } } }),
       prisma.enquiry.count({ where: { ...collegeScope, status: 'Enrolled' } }),
       prisma.enquiry.count({ where: { ...collegeScope, status: 'Enrolled', updatedAt: { gte: startOfMonth } } }),
@@ -53,22 +53,25 @@ router.get('/', async (req, res) => {
         include: { student: { select: { name: true, phone: true } }, college: { select: { name: true, city: true } } },
       }),
       prisma.enquiry.findMany({
-        where: { ...collegeScope, followUpDate: { gte: new Date(), lte: new Date(Date.now() + 3*24*60*60*1000) } },
+        where: { ...collegeScope, followUpDate: { gte: new Date(), lte: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) } },
         orderBy: { followUpDate: 'asc' }, take: 10,
         include: { student: { select: { name: true, phone: true } }, college: { select: { name: true } } },
       }),
     ]);
 
     res.json({
-      stats: { totalStudents, totalEnquiries, totalColleges, totalCourses, newToday, enrolledTotal, enrolledMonth,
-               commissionPending: commissionPending._sum.amount || 0,
-               commissionReceivedMonth: commissionReceived._sum.amount || 0 },
+      stats: {
+        totalStudents, totalEnquiries, totalColleges, totalCourses,
+        newToday, enrolledTotal, enrolledMonth,
+        commissionPending: commissionPending._sum.amount || 0,
+        commissionReceivedMonth: commissionReceived._sum.amount || 0,
+      },
       recentEnquiries,
       followUps,
       userRole: req.user.role,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
