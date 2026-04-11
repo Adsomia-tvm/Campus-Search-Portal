@@ -35,10 +35,17 @@ router.get('/', async (req, res, next) => {
     if (maxFee && Number(maxFee) > 0) where.minFee = { lte: Number(maxFee) };
 
     if (trimSearch) {
-      where.OR = [
-        { name: { contains: trimSearch, mode: 'insensitive' } },
-        { courses: { some: { isActive: true, name: { contains: trimSearch, mode: 'insensitive' } } } },
-      ];
+      // Build search variants: "sea" also matches "S.E.A.", and "s.e.a" also matches "SEA"
+      const variants = [trimSearch];
+      const noDots = trimSearch.replace(/\./g, '');
+      if (noDots !== trimSearch && noDots.length > 0) variants.push(noDots);
+      const dotted = noDots.split('').join('.');
+      if (dotted !== trimSearch && dotted !== noDots) variants.push(dotted);
+
+      where.OR = variants.flatMap(s => [
+        { name: { contains: s, mode: 'insensitive' } },
+        { courses: { some: { isActive: true, name: { contains: s, mode: 'insensitive' } } } },
+      ]);
       where.courses = hasCourseFilter ? { some: courseFilter } : { some: { isActive: true } };
     } else if (hasCourseFilter) {
       where.courses = { some: courseFilter };
