@@ -7,7 +7,7 @@ router.get('/', async (req, res, next) => {
   try {
     const { city, category, degreeLevel, minFee, maxFee, search, page = 1, limit = 20, sortBy = 'name' } = req.query;
 
-    const take = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    const take = Math.min(Math.max(Number(limit) || 20, 1), 300);
     const pageNum = Math.max(Math.floor(Number(page)) || 1, 1);
     const skip = (pageNum - 1) * take;
     const trimSearch = (search || '').trim();
