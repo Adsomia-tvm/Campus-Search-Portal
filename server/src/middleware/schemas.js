@@ -104,6 +104,12 @@ const createCollege = z.object({
     description: z.string().max(5000).optional().nullable(),
     approvedBy: z.string().max(200).optional().nullable(),
     accreditation: z.string().max(200).optional().nullable(),
+    // COL-01: partnership + verification
+    verificationLevel: z.enum(['Unverified', 'Basic', 'Verified', 'Premium']).optional(),
+    partnershipTier:   z.enum(['Starter', 'Growth', 'Elite', 'Institutional']).optional(),
+    monthlyLeadCap:    z.coerce.number().int().min(0).optional().nullable(),
+    pricePerLead:      z.coerce.number().int().min(0).optional().nullable(),
+    partnershipSince:  z.string().datetime().optional().nullable(),
   }),
 });
 

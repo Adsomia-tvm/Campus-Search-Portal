@@ -15,12 +15,13 @@ const CAT_COLORS = {
 export default function CollegeCard({ college }) {
   const { addCollege, removeCollege, isSelected } = useCompareStore();
   const minFee = college.courses?.reduce((min, c) => c.totalFee && c.totalFee < min ? c.totalFee : min, Infinity);
+  const detailUrl = college.slug && college.citySlug ? `/colleges/${college.citySlug}/${college.slug}` : `/college/${college.id}`;
 
   return (
     <div className="card flex flex-col active:scale-[0.99] transition-transform">
       <div className="p-4 md:p-5 flex-1">
         <div className="flex items-start justify-between gap-2 mb-2">
-          <Link to={`/college/${college.id}`}
+          <Link to={detailUrl}
             className="font-bold text-brand hover:text-brand-light leading-snug text-sm md:text-base">
             {college.name}
           </Link>
@@ -65,7 +66,7 @@ export default function CollegeCard({ college }) {
 
       {/* Action buttons — full width touch targets */}
       <div className="border-t px-4 md:px-5 py-3 flex gap-2">
-        <Link to={`/college/${college.id}`}
+        <Link to={detailUrl}
           className="btn-primary text-sm flex-1 text-center py-2.5">
           View Details
         </Link>

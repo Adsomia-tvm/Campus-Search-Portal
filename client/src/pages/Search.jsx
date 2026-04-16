@@ -132,7 +132,7 @@ export default function Search() {
       itemListElement: data.colleges.slice(0, 10).map((c, i) => ({
         '@type': 'ListItem',
         position: i + 1,
-        url: `${window.location.origin}/college/${c.id}`,
+        url: c.slug && c.citySlug ? `${window.location.origin}/colleges/${c.citySlug}/${c.slug}` : `${window.location.origin}/college/${c.id}`,
         name: c.name,
       })),
     };

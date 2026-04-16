@@ -169,7 +169,7 @@ export default function Home() {
                     <p className="font-bold text-brand text-sm">₹{(c.totalFee / 100000).toFixed(1)}L</p>
                     <p className="text-xs text-gray-400">total</p>
                   </div>
-                  <a href={`/college/${c.college?.id}`}
+                  <a href={c.college?.slug && c.college?.citySlug ? `/colleges/${c.college.citySlug}/${c.college.slug}` : `/college/${c.college?.id}`}
                     className="btn-primary text-xs px-3 py-2 flex-shrink-0">
                     View
                   </a>

@@ -92,6 +92,7 @@ app.use('/api/admin/commissions',   require('./routes/admin/commissions'));
 app.use('/api/admin/reports',       require('./routes/admin/reports'));
 app.use('/api/admin/import',        require('./routes/admin/import'));
 app.use('/api/admin/users',         require('./routes/admin/users'));
+app.use('/api/admin/tiers',         require('./routes/admin/tiers'));
 
 // ── Health check (safe for production — no env/db details leaked) ────────────
 app.get('/api/health', async (req, res) => {

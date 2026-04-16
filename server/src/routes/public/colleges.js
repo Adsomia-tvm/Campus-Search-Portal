@@ -138,7 +138,7 @@ router.get('/top10', async (req, res, next) => {
       },
       orderBy: { totalFee: 'asc' },
       take: 10,
-      include: { college: { select: { id: true, name: true, city: true } } },
+      include: { college: { select: { id: true, name: true, city: true, slug: true, citySlug: true } } },
     });
     staticCache.set(cacheKey, courses);
     res.json(courses);

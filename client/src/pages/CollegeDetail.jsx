@@ -177,16 +177,17 @@ export default function CollegeDetail() {
   usePageTitle(college ? `${college.name} — ${feeStr || 'Courses'} & Fees 2026-27` : 'College Details');
   useSeoMeta(college);
 
+  const collegeId = college?.id || id;
   const { data: related } = useQuery({
-    queryKey: ['related', id],
-    queryFn: () => getRelatedColleges(id),
-    enabled: !!college,
+    queryKey: ['related', collegeId],
+    queryFn: () => getRelatedColleges(collegeId),
+    enabled: !!collegeId,
   });
 
   const { data: stats } = useQuery({
-    queryKey: ['stats', id],
-    queryFn: () => getCollegeStats(id),
-    enabled: !!college,
+    queryKey: ['stats', collegeId],
+    queryFn: () => getCollegeStats(collegeId),
+    enabled: !!collegeId,
   });
 
   const faqItems = college ? buildFaq(college) : [];

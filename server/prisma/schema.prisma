@@ -28,6 +28,15 @@ model College {
   metaTitle       String?   // Custom title tag override
   metaDescription String?   // Custom meta description override
   isActive        Boolean   @default(true)
+
+  // ── Partnership & Verification (COL-01, plan Module 04/15) ────────────────
+  // Source of truth for tier-gated lead allocation + commercial rules.
+  verificationLevel String  @default("Unverified") // Unverified / Basic / Verified / Premium
+  partnershipTier   String  @default("Starter")    // Starter / Growth / Elite / Institutional
+  monthlyLeadCap    Int?                            // null = unlimited (Institutional default)
+  pricePerLead      Int?                            // INR per allocated lead — override tier default
+  partnershipSince  DateTime?                       // When partnership became active
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -45,6 +54,9 @@ model College {
   @@index([isActive, maxFee])  // fee sort index
   @@index([slug])
   @@index([citySlug])
+  @@index([partnershipTier])             // tier-gated queries
+  @@index([verificationLevel])           // verification filter
+  @@index([partnershipTier, isActive])   // dashboard: active colleges by tier
   @@map("colleges")
 }
 

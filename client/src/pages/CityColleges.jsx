@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '../components/Navbar';
 import { getCityColleges } from '../api';
@@ -14,6 +14,12 @@ function slugToName(slug) {
 
 export default function CityColleges() {
   const { citySlug } = useParams();
+
+  // Guard: if citySlug looks like a number, redirect to /college/:id
+  if (/^\d+$/.test(citySlug)) {
+    return <Navigate to={`/college/${citySlug}`} replace />;
+  }
+
   const [selectedCat, setSelectedCat] = useState('');
   const cityName = slugToName(citySlug);
 
