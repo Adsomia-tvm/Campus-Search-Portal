@@ -126,6 +126,7 @@ model Enquiry {
   studentId      Int
   collegeId      Int
   courseId       Int?
+  agentId        Int?     // Referring agent (if lead came through an agent)
   status         String   @default("New") // New / Contacted / Visited / Applied / Enrolled / Dropped
   counselorId    Int?
   followUpDate   DateTime?
@@ -137,6 +138,7 @@ model Enquiry {
   college    College     @relation(fields: [collegeId], references: [id])
   course     Course?     @relation(fields: [courseId], references: [id])
   counselor  User?       @relation(fields: [counselorId], references: [id])
+  agent      Agent?      @relation(fields: [agentId], references: [id])
   commission Commission?
 
   @@unique([studentId, collegeId]) // Prevent duplicate enquiries per student-college pair
@@ -144,6 +146,7 @@ model Enquiry {
   @@index([collegeId])
   @@index([status])
   @@index([counselorId])
+  @@index([agentId])
   @@index([createdAt])
   @@index([collegeId, status])      // dashboard: status counts scoped to colleges
   @@index([collegeId, createdAt])   // dashboard: recent enquiries per college
@@ -255,7 +258,8 @@ model Agent {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enquiries Enquiry[]
 
   @@index([referralCode])
   @@map("agents")
