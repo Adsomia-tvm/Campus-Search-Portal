@@ -31,28 +31,26 @@ router.get('/dashboard', async (req, res, next) => {
     const active = statusCounts.filter(s => !['Enrolled', 'Dropped'].includes(s.status))
       .reduce((sum, s) => sum + s._count, 0);
 
-    // Commission summary
+    // Commission summary — use direct agentId on commission
     const commissions = await prisma.commission.aggregate({
-      where: {
-        enquiry: { agentId: agent.id },
-      },
-      _sum: { amount: true },
+      where: { agentId: agent.id },
+      _sum: { amount: true, agentAmount: true },
       _count: true,
     });
 
     const pendingCommissions = await prisma.commission.aggregate({
-      where: {
-        enquiry: { agentId: agent.id },
-        status: 'Pending',
-      },
-      _sum: { amount: true },
+      where: { agentId: agent.id, status: 'Pending' },
+      _sum: { agentAmount: true },
     });
 
     const receivedCommissions = await prisma.commission.aggregate({
-      where: {
-        enquiry: { agentId: agent.id },
-        status: 'Received',
-      },
+      where: { agentId: agent.id, status: 'Received' },
+      _sum: { agentAmount: true },
+    });
+
+    // Payout summary
+    const payoutSummary = await prisma.agentPayout.aggregate({
+      where: { agentId: agent.id, status: 'Paid' },
       _sum: { amount: true },
     });
 
@@ -81,9 +79,10 @@ router.get('/dashboard', async (req, res, next) => {
         statusBreakdown: Object.fromEntries(statusCounts.map(s => [s.status, s._count])),
       },
       commissions: {
-        total: commissions._sum.amount || 0,
-        pending: pendingCommissions._sum.amount || 0,
-        received: receivedCommissions._sum.amount || 0,
+        total: commissions._sum.agentAmount || 0,
+        pending: pendingCommissions._sum.agentAmount || 0,
+        received: receivedCommissions._sum.agentAmount || 0,
+        paid: payoutSummary._sum.amount || 0,
         count: commissions._count || 0,
       },
       recentLeads,
@@ -217,6 +216,88 @@ router.put('/profile', async (req, res, next) => {
       panNumber: updated.panNumber ? `****${updated.panNumber.slice(-4)}` : null,
       user: updated.user,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /api/agent/commissions ──────────────────────────────────────────────
+// Agent's commission history (what they've earned)
+router.get('/commissions', async (req, res, next) => {
+  try {
+    const agent = await prisma.agent.findUnique({
+      where: { userId: req.user.id },
+      select: { id: true },
+    });
+    if (!agent) return res.status(404).json({ error: 'Agent profile not found' });
+
+    const { status, page = 1, limit = 30 } = req.query;
+    const where = { agentId: agent.id, agentAmount: { gt: 0 } };
+    if (status) where.status = status;
+
+    const take = Math.min(Math.max(Number(limit) || 30, 1), 100);
+    const skip = (Math.max(Number(page), 1) - 1) * take;
+
+    const [commissions, total, summary] = await Promise.all([
+      prisma.commission.findMany({
+        where, skip, take, orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, amount: true, agentAmount: true, status: true, paymentDate: true, createdAt: true,
+          enquiry: { select: { id: true, status: true, student: { select: { name: true } } } },
+          college: { select: { name: true, city: true } },
+        },
+      }),
+      prisma.commission.count({ where }),
+      prisma.commission.groupBy({
+        by: ['status'],
+        where: { agentId: agent.id, agentAmount: { gt: 0 } },
+        _sum: { agentAmount: true },
+        _count: { id: true },
+      }),
+    ]);
+
+    const totals = {
+      totalEarned: summary.reduce((s, g) => s + (g._sum.agentAmount || 0), 0),
+      received: summary.find(g => g.status === 'Received')?._sum.agentAmount || 0,
+      pending: summary.find(g => g.status === 'Pending')?._sum.agentAmount || 0,
+    };
+
+    res.json({ commissions, total, page: Number(page), pages: Math.ceil(total / take), totals });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /api/agent/payouts ──────────────────────────────────────────────────
+// Agent's payout history
+router.get('/payouts', async (req, res, next) => {
+  try {
+    const agent = await prisma.agent.findUnique({
+      where: { userId: req.user.id },
+      select: { id: true },
+    });
+    if (!agent) return res.status(404).json({ error: 'Agent profile not found' });
+
+    const payouts = await prisma.agentPayout.findMany({
+      where: { agentId: agent.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    const summary = await prisma.agentPayout.groupBy({
+      by: ['status'],
+      where: { agentId: agent.id },
+      _sum: { amount: true },
+      _count: { id: true },
+    });
+
+    const totals = {
+      totalPaid: summary.find(g => g.status === 'Paid')?._sum.amount || 0,
+      pending: summary.find(g => g.status === 'Pending')?._sum.amount || 0,
+      processing: summary.find(g => g.status === 'Processing')?._sum.amount || 0,
+    };
+
+    res.json({ payouts, totals });
   } catch (err) {
     next(err);
   }

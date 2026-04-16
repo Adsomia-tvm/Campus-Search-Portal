@@ -168,22 +168,51 @@ model Enquiry {
 }
 
 model Commission {
-  id          Int      @id @default(autoincrement())
-  enquiryId   Int      @unique
-  collegeId   Int
-  amount      Int?
-  status      String   @default("Pending") // Pending / Received / Written Off
-  paymentDate DateTime?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  enquiryId      Int      @unique
+  collegeId      Int
+  amount         Int?            // Amount college pays to Campus Search
+  agentAmount    Int?            // Amount owed to referring agent (auto-calc from rate)
+  agentId        Int?            // Referring agent (copied from enquiry)
+  status         String   @default("Pending") // Pending / Invoiced / Received / Written Off
+  paymentDate    DateTime?
+  invoiceNumber  String?         // Track invoice ref
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   enquiry Enquiry @relation(fields: [enquiryId], references: [id])
   college College @relation(fields: [collegeId], references: [id])
+  agent   Agent?  @relation(fields: [agentId], references: [id])
 
   @@index([status])            // commission filter by status
   @@index([collegeId, status]) // dashboard aggregate
+  @@index([agentId])           // agent commission lookup
   @@map("commissions")
+}
+
+model AgentPayout {
+  id              Int      @id @default(autoincrement())
+  agentId         Int
+  amount          Int               // Total payout amount
+  commissionIds   String            // Comma-separated commission IDs included
+  status          String   @default("Pending") // Pending / Processing / Paid / Failed
+  paymentMethod   String?           // Bank Transfer / UPI / Cash
+  utrNumber       String?           // UTR or transaction reference
+  bankRef         String?           // Bank reference / cheque number
+  processedDate   DateTime?         // When payout was processed
+  paidDate        DateTime?         // When agent actually received
+  notes           String?
+  createdBy       Int?              // Admin user who created payout
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  agent   Agent @relation(fields: [agentId], references: [id])
+
+  @@index([agentId])
+  @@index([status])
+  @@index([agentId, status])
+  @@map("agent_payouts")
 }
 
 model User {
@@ -271,8 +300,10 @@ model Agent {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  enquiries Enquiry[]
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enquiries   Enquiry[]
+  commissions Commission[]
+  payouts     AgentPayout[]
 
   @@index([referralCode])
   @@map("agents")

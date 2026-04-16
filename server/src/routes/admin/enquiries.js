@@ -127,12 +127,31 @@ router.put('/:id', validate(updateEnquiry), async (req, res, next) => {
       },
     });
 
-    // Auto-create commission record when enrolled
+    // Auto-create commission record when enrolled (with agent info if applicable)
     if (req.body.status === 'Enrolled') {
+      const enqFull = await prisma.enquiry.findUnique({
+        where: { id: enquiry.id },
+        select: { agentId: true, agent: { select: { commissionRate: true } }, college: { select: { pricePerLead: true } } },
+      });
+      const commData = {
+        enquiryId: enquiry.id,
+        collegeId: enquiry.collegeId,
+        status: 'Pending',
+      };
+      // Link agent and pre-calculate agent amount if college has a price-per-lead set
+      if (enqFull?.agentId) {
+        commData.agentId = enqFull.agentId;
+        if (enqFull.college?.pricePerLead && enqFull.agent?.commissionRate) {
+          commData.amount = enqFull.college.pricePerLead;
+          commData.agentAmount = Math.round(enqFull.college.pricePerLead * (enqFull.agent.commissionRate / 100));
+        }
+      } else if (enqFull?.college?.pricePerLead) {
+        commData.amount = enqFull.college.pricePerLead;
+      }
       await prisma.commission.upsert({
         where: { enquiryId: enquiry.id },
         update: {},
-        create: { enquiryId: enquiry.id, collegeId: enquiry.collegeId, status: 'Pending' },
+        create: commData,
       });
     }
 
