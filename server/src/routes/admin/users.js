@@ -46,17 +46,21 @@ router.post('/', requireAdmin, validate(createUser), async (req, res, next) => {
     const { name, email, password, role, phone, collegeIds } = req.body;
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const user = await prisma.user.create({
-      data: {
-        name, email, passwordHash, role: role || 'staff', phone,
-        ...(role === 'consultant' && collegeIds?.length ? {
-          consultantColleges: {
-            create: collegeIds.map(id => ({ collegeId: Number(id) })),
-          },
-        } : {}),
-      },
-      select: USER_SELECT,
-    });
+    const userData = {
+      name, email, passwordHash, role: role || 'staff', phone,
+    };
+
+    // Consultant: link to assigned colleges
+    if (role === 'consultant' && collegeIds?.length) {
+      userData.consultantColleges = { create: collegeIds.map(id => ({ collegeId: Number(id) })) };
+    }
+
+    // College user: link to their college
+    if (role === 'college' && req.body.collegeId) {
+      userData.collegeId = Number(req.body.collegeId);
+    }
+
+    const user = await prisma.user.create({ data: userData, select: USER_SELECT });
     res.status(201).json(user);
   } catch (err) {
     next(err);

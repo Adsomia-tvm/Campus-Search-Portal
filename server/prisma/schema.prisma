@@ -45,6 +45,7 @@ model College {
   commissions        Commission[]
   contacts           CollegeContact[]
   consultantColleges ConsultantCollege[]
+  users              User[]             @relation("CollegeUsers")
 
   @@unique([name])
   @@index([city])
@@ -104,11 +105,13 @@ model Student {
   stream        String?  // Science / Commerce / Arts / Biology
   source        String?  // WhatsApp / Website / Referral / Walk-in
   counselorId   Int?
+  userId        Int?     @unique  // Link to User for student login (optional)
   notes         String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  counselor User?     @relation(fields: [counselorId], references: [id])
+  counselor User?     @relation("CounselorStudents", fields: [counselorId], references: [id])
+  user      User?     @relation("StudentUser", fields: [userId], references: [id])
   enquiries Enquiry[]
 
   @@index([counselorId])
@@ -168,21 +171,94 @@ model Commission {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         String   @default("staff") // admin / staff / consultant
-  phone        String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            Int       @id @default(autoincrement())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  role          String    @default("staff") // admin / staff / consultant / student / agent / college
+  phone         String?
+  isActive      Boolean   @default(true)
 
-  students           Student[]
+  // Lockout (moved from in-memory to DB for serverless persistence)
+  loginAttempts Int       @default(0)
+  lockedUntil   DateTime?
+  lastLoginAt   DateTime?
+
+  // Role-specific links
+  collegeId     Int?      // if role=college → which college this user manages
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  college            College?          @relation("CollegeUsers", fields: [collegeId], references: [id])
+  counselorStudents  Student[]         @relation("CounselorStudents")
+  studentProfile     Student?          @relation("StudentUser")
+  agent              Agent?
+  sessions           Session[]
+  auditLogs          AuditLog[]
   enquiries          Enquiry[]
   consultantColleges ConsultantCollege[]
 
+  @@index([role])
+  @@index([collegeId])
   @@map("users")
+}
+
+// ── Sessions (refresh token storage) ────────────────────────────────────────
+model Session {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  refreshToken String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ── Audit log (auth events + key actions) ───────────────────────────────────
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  action    String   // login / logout / register / password_change / role_change / lockout
+  entity    String?  // user / college / lead / enquiry
+  entityId  Int?
+  details   String?  // JSON with additional context
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ── Agent (referral partners) ───────────────────────────────────────────────
+model Agent {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @unique
+  referralCode   String   @unique  // e.g. AGT-XK7M
+  commissionRate Float?   @default(5.0)  // percentage
+  bankName       String?
+  bankAccount    String?
+  ifsc           String?
+  panNumber      String?
+  isVerified     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([referralCode])
+  @@map("agents")
 }
 
 // Links a consultant to the specific colleges they manage

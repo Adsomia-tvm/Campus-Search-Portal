@@ -33,7 +33,7 @@ function requireStaff(req, res, next) {
   });
 }
 
-// Any team member (admin / staff / consultant)
+// Any internal team member (admin / staff / consultant)
 function requireTeamMember(req, res, next) {
   requireAuth(req, res, () => {
     if (!['admin', 'staff', 'consultant'].includes(req.user.role))
@@ -42,4 +42,42 @@ function requireTeamMember(req, res, next) {
   });
 }
 
-module.exports = { requireAuth, requireAdmin, requireStaff, requireTeamMember };
+// College user — must be role=college with a linked collegeId
+function requireCollege(req, res, next) {
+  requireAuth(req, res, () => {
+    if (req.user.role !== 'college' || !req.user.collegeId)
+      return res.status(403).json({ error: 'Forbidden — college account required' });
+    next();
+  });
+}
+
+// Agent user
+function requireAgent(req, res, next) {
+  requireAuth(req, res, () => {
+    if (req.user.role !== 'agent')
+      return res.status(403).json({ error: 'Forbidden — agent account required' });
+    next();
+  });
+}
+
+// Student user
+function requireStudent(req, res, next) {
+  requireAuth(req, res, () => {
+    if (req.user.role !== 'student')
+      return res.status(403).json({ error: 'Forbidden — student account required' });
+    next();
+  });
+}
+
+// Any authenticated user with one of the specified roles
+function requireRole(...roles) {
+  return (req, res, next) => {
+    requireAuth(req, res, () => {
+      if (!roles.includes(req.user.role))
+        return res.status(403).json({ error: `Forbidden — requires ${roles.join(' or ')}` });
+      next();
+    });
+  };
+}
+
+module.exports = { requireAuth, requireAdmin, requireStaff, requireTeamMember, requireCollege, requireAgent, requireStudent, requireRole };

@@ -80,6 +80,7 @@ app.use('/api/enquiries',     enquiryLimiter, require('./routes/public/enquiries
 app.use('/api/career-leads',  enquiryLimiter, require('./routes/public/careerLeads'));
 app.use('/api/categories',    require('./routes/public/categories'));
 app.use('/api/student',       enquiryLimiter, require('./routes/public/studentAuth'));
+app.use('/api/register',      authLimiter, require('./routes/public/register'));
 
 // ── Admin Routes (JWT protected) ──────────────────────────────────────────────
 app.use('/api/auth/login',    authLimiter);
