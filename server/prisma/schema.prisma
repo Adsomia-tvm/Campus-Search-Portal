@@ -305,6 +305,21 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// ── System settings (key-value config) ─────────────────────────────────────
+model SystemSetting {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique          // e.g. "lead_scoring.website_weight"
+  value       String                    // JSON-encoded value
+  label       String?                   // Human-readable label
+  category    String   @default("general") // general / lead_scoring / commission / notification
+  description String?                   // Help text
+  updatedBy   Int?
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@map("system_settings")
+}
+
 // ── Agent (referral partners) ───────────────────────────────────────────────
 model Agent {
   id             Int      @id @default(autoincrement())

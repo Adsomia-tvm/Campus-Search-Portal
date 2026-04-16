@@ -108,6 +108,9 @@ app.use('/api/admin/reports',       require('./routes/admin/reports'));
 app.use('/api/admin/import',        require('./routes/admin/import'));
 app.use('/api/admin/users',         require('./routes/admin/users'));
 app.use('/api/admin/tiers',         require('./routes/admin/tiers'));
+app.use('/api/admin/bulk',          require('./routes/admin/bulk'));
+app.use('/api/admin/audit',         require('./routes/admin/audit'));
+app.use('/api/admin/settings',      require('./routes/admin/settings'));
 
 // ── Health check (safe for production — no env/db details leaked) ────────────
 app.get('/api/health', async (req, res) => {
