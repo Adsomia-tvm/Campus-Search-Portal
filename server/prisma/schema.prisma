@@ -131,6 +131,16 @@ model Enquiry {
   counselorId    Int?
   followUpDate   DateTime?
   notes          String?
+
+  // ── LEAD-01: Lead qualification & scoring ────────────────────────────────
+  leadScore            Int?      @default(0)       // 0-100 composite score
+  qualificationStatus  String    @default("Unqualified") // Unqualified / MQL / SQL / Won / Lost
+  source               String?   // Website / Career Clarity / Agent / WhatsApp / Walk-in / Fee Gate
+  utmSource            String?   // Google / Facebook / Instagram / etc.
+  utmMedium            String?   // cpc / social / email / referral
+  utmCampaign          String?   // campaign name
+  referralCode         String?   // Agent referral code used
+
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -151,6 +161,9 @@ model Enquiry {
   @@index([collegeId, status])      // dashboard: status counts scoped to colleges
   @@index([collegeId, createdAt])   // dashboard: recent enquiries per college
   @@index([followUpDate])           // dashboard: upcoming follow-ups
+  @@index([qualificationStatus])    // lead CRM: filter by qualification
+  @@index([leadScore])              // lead CRM: sort by score
+  @@index([source])                 // lead CRM: filter by source
   @@map("enquiries")
 }
 

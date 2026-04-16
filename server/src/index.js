@@ -96,6 +96,7 @@ app.use('/api/admin/students',      require('./routes/admin/students'));
 app.use('/api/admin/enquiries',     require('./routes/admin/enquiries'));
 app.use('/api/admin/colleges',      require('./routes/admin/colleges'));
 app.use('/api/admin/commissions',   require('./routes/admin/commissions'));
+app.use('/api/admin/leads',         require('./routes/admin/leads'));
 app.use('/api/admin/reports',       require('./routes/admin/reports'));
 app.use('/api/admin/import',        require('./routes/admin/import'));
 app.use('/api/admin/users',         require('./routes/admin/users'));

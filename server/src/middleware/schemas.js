@@ -85,6 +85,11 @@ const publicEnquiry = z.object({
     source: z.string().max(50).default('Website').optional(),
     collegeId: positiveInt,
     courseId: positiveInt.optional(),
+    // LEAD-02: UTM + referral tracking
+    utmSource: z.string().max(100).optional().nullable(),
+    utmMedium: z.string().max(100).optional().nullable(),
+    utmCampaign: z.string().max(200).optional().nullable(),
+    referralCode: z.string().max(20).optional().nullable(),
   }),
 });
 

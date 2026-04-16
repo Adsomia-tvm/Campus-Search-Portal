@@ -3,6 +3,7 @@ const prisma = require('../../lib/prisma');
 const { requireTeamMember } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { createEnquiry, updateEnquiry, idParam } = require('../../middleware/schemas');
+const { deriveQualification } = require('../../lib/leadScore');
 
 router.use(requireTeamMember);
 
@@ -108,9 +109,18 @@ router.post('/', validate(createEnquiry), async (req, res, next) => {
 // PUT /api/admin/enquiries/:id — update status, notes, follow-up
 router.put('/:id', validate(updateEnquiry), async (req, res, next) => {
   try {
+    // Auto-update qualification status when status changes
+    const updateData = pickEnquiryUpdate(req.body);
+    if (req.body.status) {
+      const existing = await prisma.enquiry.findUnique({ where: { id: Number(req.params.id) }, select: { leadScore: true } });
+      if (existing) {
+        updateData.qualificationStatus = deriveQualification(existing.leadScore || 0, req.body.status);
+      }
+    }
+
     const enquiry = await prisma.enquiry.update({
       where: { id: Number(req.params.id) },
-      data: pickEnquiryUpdate(req.body),
+      data: updateData,
       include: {
         student: { select: { name: true, phone: true } },
         college: { select: { name: true } },
