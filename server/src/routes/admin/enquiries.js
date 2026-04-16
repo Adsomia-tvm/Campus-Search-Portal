@@ -4,6 +4,7 @@ const { requireTeamMember } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { createEnquiry, updateEnquiry, idParam } = require('../../middleware/schemas');
 const { deriveQualification } = require('../../lib/leadScore');
+const { notifyStatusChange } = require('../../lib/notify');
 
 router.use(requireTeamMember);
 
@@ -111,9 +112,11 @@ router.put('/:id', validate(updateEnquiry), async (req, res, next) => {
   try {
     // Auto-update qualification status when status changes
     const updateData = pickEnquiryUpdate(req.body);
+    let oldStatus = null;
     if (req.body.status) {
-      const existing = await prisma.enquiry.findUnique({ where: { id: Number(req.params.id) }, select: { leadScore: true } });
+      const existing = await prisma.enquiry.findUnique({ where: { id: Number(req.params.id) }, select: { leadScore: true, status: true } });
       if (existing) {
+        oldStatus = existing.status;
         updateData.qualificationStatus = deriveQualification(existing.leadScore || 0, req.body.status);
       }
     }
@@ -153,6 +156,11 @@ router.put('/:id', validate(updateEnquiry), async (req, res, next) => {
         update: {},
         create: commData,
       });
+    }
+
+    // Fire notification on status change (fire-and-forget)
+    if (req.body.status && oldStatus && req.body.status !== oldStatus) {
+      notifyStatusChange(enquiry, oldStatus, req.body.status);
     }
 
     res.json(enquiry);

@@ -6,6 +6,7 @@ const router = require('express').Router();
 const prisma = require('../../lib/prisma');
 const { requireAgent } = require('../../middleware/auth');
 const { logAudit, getIp } = require('../../lib/audit');
+const { notifyAgentReferral } = require('../../lib/notify');
 
 router.use(requireAgent);
 
@@ -365,6 +366,10 @@ router.post('/refer', async (req, res, next) => {
       entityId: enquiry.id, details: { collegeId: college.id, studentPhone: cleanPhone },
       ipAddress: getIp(req),
     });
+
+    // Notify admin of agent referral (fire-and-forget)
+    const agentUser = await prisma.user.findUnique({ where: { id: req.user.id }, select: { name: true } });
+    notifyAgentReferral(enquiry, agentUser?.name || 'Agent');
 
     res.status(201).json(enquiry);
   } catch (err) {

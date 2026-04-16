@@ -215,6 +215,25 @@ model AgentPayout {
   @@map("agent_payouts")
 }
 
+model NotificationLog {
+  id          Int      @id @default(autoincrement())
+  channel     String               // email / whatsapp / sms
+  recipient   String               // email address or phone number
+  event       String               // enquiry.new / enquiry.statusChange / commission.created etc.
+  entityType  String?              // Enquiry / Commission / AgentPayout
+  entityId    Int?
+  status      String   @default("sent") // sent / failed / pending
+  error       String?              // Error message if failed
+  metadata    String?              // JSON blob for extra context
+  createdAt   DateTime @default(now())
+
+  @@index([event])
+  @@index([channel])
+  @@index([recipient])
+  @@index([createdAt])
+  @@map("notification_logs")
+}
+
 model User {
   id            Int       @id @default(autoincrement())
   name          String

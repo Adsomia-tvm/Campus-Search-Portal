@@ -77,6 +77,7 @@ app.use(express.static(_distPath));
 // ── Public Routes ─────────────────────────────────────────────────────────────
 app.use('/api/colleges',      require('./routes/public/colleges'));
 app.use('/api/enquiries',     enquiryLimiter, require('./routes/public/enquiries'));
+app.use('/api/whatsapp',     require('./routes/public/whatsapp'));
 app.use('/api/career-leads',  enquiryLimiter, require('./routes/public/careerLeads'));
 app.use('/api/categories',    require('./routes/public/categories'));
 app.use('/api/student',       enquiryLimiter, require('./routes/public/studentAuth'));
@@ -100,6 +101,7 @@ app.use('/api/admin/enquiries',     require('./routes/admin/enquiries'));
 app.use('/api/admin/colleges',      require('./routes/admin/colleges'));
 app.use('/api/admin/commissions',   require('./routes/admin/commissions'));
 app.use('/api/admin/payouts',       require('./routes/admin/payouts'));
+app.use('/api/admin/notifications', require('./routes/admin/notifications'));
 app.use('/api/admin/leads',         require('./routes/admin/leads'));
 app.use('/api/admin/reports',       require('./routes/admin/reports'));
 app.use('/api/admin/import',        require('./routes/admin/import'));

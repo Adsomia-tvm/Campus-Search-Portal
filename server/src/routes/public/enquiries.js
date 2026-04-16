@@ -1,9 +1,9 @@
 const router = require('express').Router();
 const prisma = require('../../lib/prisma');
-const nodemailer = require('nodemailer');
 const validate = require('../../middleware/validate');
 const { publicEnquiry } = require('../../middleware/schemas');
 const { calculateLeadScore, deriveQualification } = require('../../lib/leadScore');
+const { notifyNewEnquiry } = require('../../lib/notify');
 
 // POST /api/enquiries — student submits enquiry from public website
 router.post('/', validate(publicEnquiry), async (req, res, next) => {
@@ -121,7 +121,7 @@ router.post('/', validate(publicEnquiry), async (req, res, next) => {
     }
 
     // Send email notification (non-blocking)
-    sendNotification(enquiry, { leadScore, qualificationStatus, isNew }).catch(console.error);
+    notifyNewEnquiry(enquiry, { leadScore, qualificationStatus, source: enquiry.source });
 
     res.status(201).json({ success: true, enquiryId: enquiry.id, leadScore, qualificationStatus });
   } catch (err) {
@@ -129,36 +129,6 @@ router.post('/', validate(publicEnquiry), async (req, res, next) => {
   }
 });
 
-async function sendNotification(enquiry, meta = {}) {
-  if (!process.env.SMTP_USER) return;
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  });
-
-  const scoreColor = meta.leadScore >= 60 ? '#16a34a' : meta.leadScore >= 30 ? '#ca8a04' : '#6b7280';
-  const qualLabel = meta.qualificationStatus || 'Unqualified';
-
-  await transporter.sendMail({
-    from: `"Campus Search Portal" <${process.env.SMTP_USER}>`,
-    to: process.env.NOTIFY_EMAIL,
-    subject: `New Enquiry — ${enquiry.student.name} → ${enquiry.college.name} [Score: ${meta.leadScore}]`,
-    html: `
-      <h2>New Student Enquiry</h2>
-      <p><b>Student:</b> ${enquiry.student.name}</p>
-      <p><b>Phone:</b> ${enquiry.student.phone}</p>
-      <p><b>Email:</b> ${enquiry.student.email || '—'}</p>
-      <p><b>College:</b> ${enquiry.college.name} (${enquiry.college.city})</p>
-      <p><b>Course:</b> ${enquiry.course?.name || '—'}</p>
-      <p><b>Preferred Category:</b> ${enquiry.student.preferredCat || '—'}</p>
-      <p><b>Budget:</b> ${enquiry.student.budgetMax?.toLocaleString('en-IN') || '—'}</p>
-      <p><b>12th %:</b> ${enquiry.student.percentage || '—'}</p>
-      <p><b>Lead Score:</b> <span style="color:${scoreColor};font-weight:bold">${meta.leadScore}/100</span> (${qualLabel})</p>
-      <hr/>
-      <p><a href="${process.env.CLIENT_URL}/admin/enquiries">Open in Admin Panel</a></p>
-    `,
-  });
-}
+// Old inline sendNotification removed — now uses centralized notify service
 
 module.exports = router;

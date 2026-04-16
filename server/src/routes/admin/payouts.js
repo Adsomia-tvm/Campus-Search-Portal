@@ -2,6 +2,7 @@ const router = require('express').Router();
 const prisma = require('../../lib/prisma');
 const { requireAdmin } = require('../../middleware/auth');
 const { logAudit, getIp } = require('../../lib/audit');
+const { notifyPayoutUpdate } = require('../../lib/notify');
 
 router.use(requireAdmin);
 
@@ -192,6 +193,17 @@ router.put('/:id', async (req, res, next) => {
       details: data,
       ip: getIp(req),
     });
+
+    // Notify agent on payout status change (fire-and-forget)
+    if (status === 'Paid' || status === 'Processing') {
+      const agent = await prisma.agent.findUnique({
+        where: { id: existing.agentId },
+        select: { user: { select: { name: true, email: true, phone: true } } },
+      });
+      if (agent?.user) {
+        notifyPayoutUpdate(payout, agent.user.email, agent.user.phone, agent.user.name);
+      }
+    }
 
     res.json(payout);
   } catch (err) {
