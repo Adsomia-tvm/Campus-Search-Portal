@@ -88,6 +88,9 @@ app.use('/api/student',       require('./routes/student/profile'));
 // ── Agent self-service routes (JWT protected) ────────────────────────────────
 app.use('/api/agent',         require('./routes/agent/dashboard'));
 
+// ── College self-service portal (JWT protected) ─────────────────────────────
+app.use('/api/college',       require('./routes/college/portal'));
+
 // ── Admin Routes (JWT protected) ──────────────────────────────────────────────
 app.use('/api/auth/login',    authLimiter);
 app.use('/api/auth',                require('./routes/admin/auth'));
