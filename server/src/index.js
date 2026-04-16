@@ -102,6 +102,7 @@ app.use('/api/admin/colleges',      require('./routes/admin/colleges'));
 app.use('/api/admin/commissions',   require('./routes/admin/commissions'));
 app.use('/api/admin/payouts',       require('./routes/admin/payouts'));
 app.use('/api/admin/notifications', require('./routes/admin/notifications'));
+app.use('/api/admin/analytics',     require('./routes/admin/analytics'));
 app.use('/api/admin/leads',         require('./routes/admin/leads'));
 app.use('/api/admin/reports',       require('./routes/admin/reports'));
 app.use('/api/admin/import',        require('./routes/admin/import'));
