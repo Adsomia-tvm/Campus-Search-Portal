@@ -82,6 +82,9 @@ app.use('/api/categories',    require('./routes/public/categories'));
 app.use('/api/student',       enquiryLimiter, require('./routes/public/studentAuth'));
 app.use('/api/register',      authLimiter, require('./routes/public/register'));
 
+// ── Student self-service routes (JWT protected) ──────────────────────────────
+app.use('/api/student',       require('./routes/student/profile'));
+
 // ── Admin Routes (JWT protected) ──────────────────────────────────────────────
 app.use('/api/auth/login',    authLimiter);
 app.use('/api/auth',                require('./routes/admin/auth'));
