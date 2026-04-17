@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { agentRefer, getAdminColleges } from '../../api';
+import { agentRefer, getAgentColleges } from '../../api';
 import usePageTitle from '../../hooks/usePageTitle';
 
 export default function AgentRefer() {
@@ -12,27 +12,22 @@ export default function AgentRefer() {
     collegeId: '', courseId: '', preferredCat: '', notes: '',
   });
   const [collegeSearch, setCollegeSearch] = useState('');
+  const [selectedCollege, setSelectedCollege] = useState(null);
   const [success, setSuccess] = useState(null);
 
   const { data: collegesData } = useQuery({
-    queryKey: ['agent-colleges'],
-    queryFn: () => getAdminColleges({ limit: 300 }),
+    queryKey: ['agent-colleges', collegeSearch],
+    queryFn: () => getAgentColleges({ search: collegeSearch }),
+    enabled: collegeSearch.length >= 2,
   });
 
-  const allColleges = collegesData?.colleges || [];
-  const filteredColleges = collegeSearch
-    ? allColleges.filter(c =>
-        c.name.toLowerCase().includes(collegeSearch.toLowerCase()) ||
-        (c.city || '').toLowerCase().includes(collegeSearch.toLowerCase())
-      ).slice(0, 20)
-    : [];
-
-  const selectedCollege = allColleges.find(c => c.id === Number(form.collegeId));
+  const filteredColleges = collegesData?.colleges || [];
 
   const mutation = useMutation({
     mutationFn: agentRefer,
     onSuccess: (data) => {
       setSuccess(data);
+      setSelectedCollege(null);
       setForm({ studentName: '', studentPhone: '', studentEmail: '', collegeId: '', courseId: '', preferredCat: '', notes: '' });
     },
   });
@@ -115,7 +110,7 @@ export default function AgentRefer() {
                   <p className="text-sm font-medium text-gray-900">{selectedCollege.name}</p>
                   <p className="text-xs text-gray-500">{selectedCollege.city}, {selectedCollege.state}</p>
                 </div>
-                <button type="button" onClick={() => setForm(f => ({ ...f, collegeId: '', courseId: '' }))}
+                <button type="button" onClick={() => { setForm(f => ({ ...f, collegeId: '', courseId: '' })); setSelectedCollege(null); }}
                   className="text-xs text-red-500 hover:underline">Change</button>
               </div>
             ) : (
@@ -127,7 +122,7 @@ export default function AgentRefer() {
                   <div className="mt-2 max-h-48 overflow-y-auto border border-gray-100 rounded-lg">
                     {filteredColleges.map(c => (
                       <button key={c.id} type="button"
-                        onClick={() => { setForm(f => ({ ...f, collegeId: String(c.id) })); setCollegeSearch(''); }}
+                        onClick={() => { setForm(f => ({ ...f, collegeId: String(c.id) })); setSelectedCollege(c); setCollegeSearch(''); }}
                         className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-50 last:border-0">
                         <p className="text-sm font-medium text-gray-900">{c.name}</p>
                         <p className="text-xs text-gray-400">{c.city}, {c.state}</p>

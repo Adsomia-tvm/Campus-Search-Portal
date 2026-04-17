@@ -304,6 +304,30 @@ router.get('/payouts', async (req, res, next) => {
   }
 });
 
+// ── GET /api/agent/colleges ──────────────────────────────────────────────────
+// List active colleges for the referral form
+router.get('/colleges', async (req, res, next) => {
+  try {
+    const { search } = req.query;
+    const where = { isActive: true };
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { city: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    const colleges = await prisma.college.findMany({
+      where,
+      select: { id: true, name: true, city: true, state: true },
+      orderBy: { name: 'asc' },
+      take: 50,
+    });
+    res.json({ colleges });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ── POST /api/agent/refer ────────────────────────────────────────────────────
 // Agent submits a new student referral (creates student + enquiry linked to agent)
 router.post('/refer', async (req, res, next) => {

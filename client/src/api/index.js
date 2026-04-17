@@ -74,3 +74,4 @@ export const updateAgentProfile   = (d)      => api.put('/agent/profile', d).the
 export const getAgentCommissions  = (p)      => api.get('/agent/commissions', { params: p }).then(r => r.data);
 export const getAgentPayouts      = ()       => api.get('/agent/payouts').then(r => r.data);
 export const agentRefer           = (d)      => api.post('/agent/refer', d).then(r => r.data);
+export const getAgentColleges     = (p)      => api.get('/agent/colleges', { params: p }).then(r => r.data);
