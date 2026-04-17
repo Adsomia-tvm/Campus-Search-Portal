@@ -203,7 +203,7 @@ const createUser = z.object({
     name: z.string().trim().min(2).max(100),
     email: z.string().email(),
     password: z.string().min(8, 'Password must be at least 8 characters'),
-    role: z.enum(['staff', 'consultant', 'college']),  // admin via setup or DB; student/agent via self-reg
+    role: z.enum(['staff', 'consultant', 'college', 'agent']),
     phone: z.string().max(20).optional().nullable(),
     collegeIds: z.array(positiveInt).optional(),   // for consultant role
     collegeId: positiveInt.optional(),              // for college role
