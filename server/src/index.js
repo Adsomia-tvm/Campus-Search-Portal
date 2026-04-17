@@ -281,6 +281,47 @@ app.get('/college/:id', async (req, res) => {
   res.sendFile(_path.join(_distPath, 'index.html'));
 });
 
+// ── 410 Gone — old Laravel URLs that Google still crawls ─────────────────────
+// GSC shows 1,007 "Crawled — currently not indexed" URLs from the old site.
+// Returning 410 tells Google these are permanently removed → stop crawling them.
+const GONE_PATTERNS = [
+  '/course/details',        // /course/details/626/bba  (826 URLs)
+  '/public/index.php',      // /public/index.php/...     (496 URLs)
+  '/public/course',         // /public/course/type/12    (223 URLs)
+  '/master/course',         // /master/course/details/10 (36 URLs)
+  '/public/master',         // /public/master/...        (28 URLs)
+  '/public/university',     // /public/university/...    (16 URLs)
+  '/college/details',       // /college/details/150      (14 URLs)
+  '/public/college',        // /public/college/details/  (14 URLs)
+  '/trending/course',       // /trending/course?page=7   (6 URLs)
+  '/university/details',    // /university/details/3     (3 URLs)
+  '/course/type',           // /course/type/3            (3 URLs)
+  '/public/all',            // /public/all/universities  (2 URLs)
+  '/public/login',
+  '/public/about',
+  '/public/contact',
+  '/public/blog',
+  '/public/fetch-course-names',
+  '/public/get-wishlist-property',
+  '/get-wishlist-property',
+  '/upload/brocher',
+  '/blog/details',
+];
+
+app.use((req, res, next) => {
+  const p = req.path;
+  // Also catch college slugs with "null" in them (bad old data)
+  if (p.includes('null--')) {
+    return res.status(410).send('<!DOCTYPE html><html><head><title>410 Gone</title></head><body><h1>410 Gone</h1><p>This page has been permanently removed.</p><p><a href="https://campussearch.in">Go to Campus Search</a></p></body></html>');
+  }
+  for (const pattern of GONE_PATTERNS) {
+    if (p.startsWith(pattern)) {
+      return res.status(410).send('<!DOCTYPE html><html><head><title>410 Gone</title></head><body><h1>410 Gone</h1><p>This page has been permanently removed.</p><p><a href="https://campussearch.in">Go to Campus Search</a></p></body></html>');
+    }
+  }
+  next();
+});
+
 // ── SPA fallback — send index.html for all non-API routes ───────────────────
 app.get('*', (req, res) => {
   res.sendFile(_path.join(_distPath, 'index.html'));
