@@ -242,4 +242,52 @@ router.get('/courses', async (req, res, next) => {
   }
 });
 
+// ── PUT /api/college/courses/:id ────────────────────────────────────────────
+// College can update fees for their own courses
+router.put('/courses/:id', async (req, res, next) => {
+  try {
+    const course = await prisma.course.findFirst({
+      where: { id: Number(req.params.id), collegeId: req.user.collegeId },
+    });
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+
+    const { y1Fee, y2Fee, y3Fee, y4Fee, y5Fee, totalFee, hostelPerYr } = req.body;
+    const data = {};
+
+    // Only allow fee fields — colleges cannot rename courses or change category
+    if (y1Fee !== undefined) data.y1Fee = y1Fee === null ? null : Number(y1Fee);
+    if (y2Fee !== undefined) data.y2Fee = y2Fee === null ? null : Number(y2Fee);
+    if (y3Fee !== undefined) data.y3Fee = y3Fee === null ? null : Number(y3Fee);
+    if (y4Fee !== undefined) data.y4Fee = y4Fee === null ? null : Number(y4Fee);
+    if (y5Fee !== undefined) data.y5Fee = y5Fee === null ? null : Number(y5Fee);
+    if (totalFee !== undefined) data.totalFee = totalFee === null ? null : Number(totalFee);
+    if (hostelPerYr !== undefined) data.hostelPerYr = hostelPerYr === null ? null : Number(hostelPerYr);
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'No valid fee fields to update' });
+    }
+
+    const updated = await prisma.course.update({
+      where: { id: course.id },
+      data,
+      select: {
+        id: true, name: true, category: true, degreeLevel: true,
+        durationYrs: true, y1Fee: true, y2Fee: true, y3Fee: true,
+        y4Fee: true, y5Fee: true, totalFee: true, hostelPerYr: true,
+        isActive: true,
+        _count: { select: { enquiries: true } },
+      },
+    });
+
+    logAudit({
+      userId: req.user.id, action: 'college_update_course_fee', entity: 'course',
+      entityId: course.id, details: { changes: data }, ipAddress: getIp(req),
+    });
+
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

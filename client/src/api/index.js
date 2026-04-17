@@ -56,3 +56,22 @@ export const getTeam             = ()       => api.get('/admin/users').then(r =>
 export const createTeamMember    = (d)      => api.post('/admin/users', d).then(r => r.data);
 export const updateTeamMember    = (id, d)  => api.put(`/admin/users/${id}`, d).then(r => r.data);
 export const setConsultantColleges = (id, collegeIds) => api.put(`/admin/users/${id}/colleges`, { collegeIds }).then(r => r.data);
+
+// ── College portal helpers ─────────────────────────────────────────────────
+export const getCollegeDashboard  = ()       => api.get('/college/dashboard').then(r => r.data);
+export const getCollegeEnquiries  = (p)      => api.get('/college/enquiries', { params: p }).then(r => r.data);
+export const getCollegeEnquiry    = (id)     => api.get(`/college/enquiries/${id}`).then(r => r.data);
+export const updateCollegeEnquiry = (id, d)  => api.put(`/college/enquiries/${id}`, d).then(r => r.data);
+export const getCollegeProfile    = ()       => api.get('/college/profile').then(r => r.data);
+export const getCollegeCourses    = ()       => api.get('/college/courses').then(r => r.data);
+export const updateCollegeCourse  = (id, d)  => api.put(`/college/courses/${id}`, d).then(r => r.data);
+
+// ── Agent portal helpers ──────────────────────────────────────────────────
+export const getAgentDashboard    = ()       => api.get('/agent/dashboard').then(r => r.data);
+export const getAgentLeads        = (p)      => api.get('/agent/leads', { params: p }).then(r => r.data);
+export const getAgentProfile      = ()       => api.get('/agent/profile').then(r => r.data);
+export const updateAgentProfile   = (d)      => api.put('/agent/profile', d).then(r => r.data);
+export const getAgentCommissions  = (p)      => api.get('/agent/commissions', { params: p }).then(r => r.data);
+export const getAgentPayouts      = ()       => api.get('/agent/payouts').then(r => r.data);
+export const agentRefer           = (d)      => api.post('/agent/refer', d).then(r => r.data);
+export const getAgentColleges     = (p)      => api.get('/agent/colleges', { params: p }).then(r => r.data);

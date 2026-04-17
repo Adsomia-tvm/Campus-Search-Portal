@@ -304,6 +304,30 @@ router.get('/payouts', async (req, res, next) => {
   }
 });
 
+// ── GET /api/agent/colleges ──────────────────────────────────────────────────
+// List active colleges for the referral form
+router.get('/colleges', async (req, res, next) => {
+  try {
+    const { search } = req.query;
+    const where = { isActive: true };
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { city: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    const colleges = await prisma.college.findMany({
+      where,
+      select: { id: true, name: true, city: true, state: true },
+      orderBy: { name: 'asc' },
+      take: 50,
+    });
+    res.json({ colleges });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ── POST /api/agent/refer ────────────────────────────────────────────────────
 // Agent submits a new student referral (creates student + enquiry linked to agent)
 router.post('/refer', async (req, res, next) => {
@@ -311,21 +335,24 @@ router.post('/refer', async (req, res, next) => {
     const agent = await prisma.agent.findUnique({ where: { userId: req.user.id }, select: { id: true } });
     if (!agent) return res.status(404).json({ error: 'Agent profile not found' });
 
-    const { studentName, studentPhone, studentEmail, collegeId, courseId, preferredCat, notes } = req.body;
+    const { studentName, studentPhone, studentEmail, collegeId, courseId, preferredCat, source, notes } = req.body;
 
-    if (!studentName || !studentPhone || !collegeId) {
-      return res.status(400).json({ error: 'studentName, studentPhone, and collegeId are required' });
+    if (!studentName || !studentPhone) {
+      return res.status(400).json({ error: 'studentName and studentPhone are required' });
     }
 
     const cleanPhone = studentPhone.trim().replace(/\s+/g, '');
 
-    // Verify college exists
-    const college = await prisma.college.findUnique({
-      where: { id: Number(collegeId) },
-      select: { id: true, isActive: true },
-    });
-    if (!college || !college.isActive) {
-      return res.status(404).json({ error: 'College not found or inactive' });
+    // Verify college if provided
+    let college = null;
+    if (collegeId) {
+      college = await prisma.college.findUnique({
+        where: { id: Number(collegeId) },
+        select: { id: true, isActive: true },
+      });
+      if (!college || !college.isActive) {
+        return res.status(404).json({ error: 'College not found or inactive' });
+      }
     }
 
     // Upsert student (phone is the unique key)
@@ -336,42 +363,45 @@ router.post('/refer', async (req, res, next) => {
         phone: cleanPhone,
         email: studentEmail?.trim() || null,
         preferredCat: preferredCat || null,
-        source: 'Agent',
+        source: source || 'Agent',
       },
       update: {
-        // Update email if provided
         ...(studentEmail?.trim() && { email: studentEmail.trim() }),
       },
     });
 
-    // Create enquiry linked to agent
-    const enquiry = await prisma.enquiry.create({
-      data: {
-        studentId: student.id,
-        collegeId: college.id,
-        courseId: courseId ? Number(courseId) : null,
-        agentId: agent.id,
-        status: 'New',
-        notes: notes?.slice(0, 2000) || 'Referred by agent',
-      },
-      select: {
-        id: true, status: true, createdAt: true,
-        student: { select: { name: true, phone: true } },
-        college: { select: { name: true, city: true } },
-      },
-    });
+    // Create enquiry if college selected, otherwise just register the student lead
+    let enquiry = null;
+    if (college) {
+      enquiry = await prisma.enquiry.create({
+        data: {
+          studentId: student.id,
+          collegeId: college.id,
+          courseId: courseId ? Number(courseId) : null,
+          agentId: agent.id,
+          status: 'New',
+          notes: notes?.slice(0, 2000) || 'Referred by agent',
+        },
+        select: {
+          id: true, status: true, createdAt: true,
+          student: { select: { name: true, phone: true } },
+          college: { select: { name: true, city: true } },
+        },
+      });
+    }
 
     logAudit({
-      userId: req.user.id, action: 'agent_refer', entity: 'enquiry',
-      entityId: enquiry.id, details: { collegeId: college.id, studentPhone: cleanPhone },
+      userId: req.user.id, action: 'agent_refer', entity: enquiry ? 'enquiry' : 'student',
+      entityId: enquiry?.id || student.id,
+      details: { collegeId: college?.id || null, studentPhone: cleanPhone },
       ipAddress: getIp(req),
     });
 
     // Notify admin of agent referral (fire-and-forget)
     const agentUser = await prisma.user.findUnique({ where: { id: req.user.id }, select: { name: true } });
-    notifyAgentReferral(enquiry, agentUser?.name || 'Agent');
+    notifyAgentReferral(enquiry || { student, college: null }, agentUser?.name || 'Agent');
 
-    res.status(201).json(enquiry);
+    res.status(201).json(enquiry || { student: { name: student.name, phone: student.phone }, college: null, status: 'Pending Assignment' });
   } catch (err) {
     if (err.code === 'P2002') {
       return res.status(409).json({ error: 'This student already has an enquiry for this college' });

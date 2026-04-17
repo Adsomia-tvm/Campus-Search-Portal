@@ -156,7 +156,7 @@ router.get('/export', async (req, res, next) => {
     ];
 
     const escCsv = (val) => {
-      if (val == null) return '';
+      if (val === null || val === undefined) return '';
       const s = String(val).replace(/"/g, '""');
       return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s;
     };
@@ -216,7 +216,7 @@ router.get('/export/colleges', async (req, res, next) => {
     ];
 
     const escCsv = (val) => {
-      if (val == null) return '';
+      if (val === null || val === undefined) return '';
       const s = String(val).replace(/"/g, '""');
       return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s;
     };

@@ -84,7 +84,7 @@ export default function Students() {
                 <div><label className="label">City</label><input name="city" className="input" /></div>
                 <div><label className="label">Source</label>
                   <select name="source" className="input">
-                    {['Website','WhatsApp','Referral','Walk-in','Phone'].map(s => <option key={s}>{s}</option>)}
+                    {['Website','Meta Ads','Google Ads','WhatsApp','Referral','Cold Pitch','Webinar','Walk-in','Phone','Direct','Instagram','YouTube','Education Fair','Agent','Other'].map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
