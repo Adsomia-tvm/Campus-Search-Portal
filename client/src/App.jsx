@@ -10,6 +10,7 @@ const CityColleges  = lazy(() => import('./pages/CityColleges'));
 const Compare       = lazy(() => import('./pages/Compare'));
 const Enquiry       = lazy(() => import('./pages/Enquiry'));
 const Thanks        = lazy(() => import('./pages/Thanks'));
+const Recommend     = lazy(() => import('./pages/Recommend'));
 
 // Admin pages — lazy loaded (only downloaded when admin navigates)
 const Login         = lazy(() => import('./pages/admin/Login'));
@@ -80,6 +81,7 @@ export default function App() {
       <Route path="/compare"      element={<Compare />} />
       <Route path="/enquire"      element={<Enquiry />} />
       <Route path="/thanks"       element={<Thanks />} />
+      <Route path="/recommend"    element={<Recommend />} />
 
       {/* Admin */}
       <Route path="/admin/login"  element={<Login />} />

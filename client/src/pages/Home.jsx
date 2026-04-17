@@ -133,6 +133,22 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Recommender CTA */}
+      <section className="max-w-4xl mx-auto px-4 py-8">
+        <div
+          onClick={() => navigate('/recommend')}
+          className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-6 md:p-8 text-white cursor-pointer hover:shadow-xl transition-shadow"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg md:text-xl font-bold mb-1">Not sure which college is right for you?</h2>
+              <p className="text-indigo-100 text-sm">Answer 4 quick questions and get personalized college recommendations.</p>
+            </div>
+            <span className="text-3xl flex-shrink-0">&#x2192;</span>
+          </div>
+        </div>
+      </section>
+
       {/* Category cards */}
       <section className="max-w-7xl mx-auto px-4 py-10">
         <h2 className="text-xl md:text-2xl font-bold text-brand mb-5">Browse by Stream</h2>

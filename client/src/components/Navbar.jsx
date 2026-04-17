@@ -21,6 +21,7 @@ export default function Navbar() {
         {/* Desktop links */}
         <div className="hidden md:flex items-center gap-6 text-sm font-medium">
           <Link to="/search"  className="hover:text-blue-200 transition-colors">Find Colleges</Link>
+          <Link to="/recommend" className="hover:text-blue-200 transition-colors">Recommend</Link>
           <Link to="/compare" className="hover:text-blue-200 transition-colors">Compare</Link>
           {student ? (
             <div className="flex items-center gap-3">
@@ -47,6 +48,7 @@ export default function Navbar() {
       {open && (
         <div className="md:hidden bg-brand-light px-4 py-3 space-y-2 text-sm font-medium">
           <Link to="/search"  className="block py-2" onClick={() => setOpen(false)}>Find Colleges</Link>
+          <Link to="/recommend" className="block py-2" onClick={() => setOpen(false)}>Recommend</Link>
           <Link to="/compare" className="block py-2" onClick={() => setOpen(false)}>Compare</Link>
           {student ? (
             <>

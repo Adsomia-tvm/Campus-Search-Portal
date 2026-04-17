@@ -64,9 +64,11 @@ async function processMessage(phone, message) {
 
   const session = getSession(phone);
 
-  // ── AI shortcut: natural language questions go to AI counselor from main menu
-  if (session.state === 'MAIN_MENU' && text.length > 5 && isNaN(text)) {
-    // Not a menu number — treat as natural conversation
+  // ── AI counselor: any non-menu input goes to AI when we have conversation history
+  // Menu numbers (1-4) and short commands go through menu flow; everything else → AI
+  const isMenuNumber = /^[1-4]$/.test(text.trim());
+  const hasAIHistory = (session.history || []).some(h => h.role === 'bot' && h.text && !h.text.includes('Choose an option'));
+  if (session.state === 'MAIN_MENU' && !isMenuNumber && (hasAIHistory || text.length > 5)) {
     const aiResponse = await aiReply(text, session.history || []);
     if (aiResponse) {
       addToHistory(phone, 'bot', aiResponse);

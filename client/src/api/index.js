@@ -38,6 +38,10 @@ export const submitEnquiry    = (data) => api.post('/enquiries', data).then(r =>
 export const studentAuth      = (data) => api.post('/student/auth', data).then(r => r.data);
 export const getStudentMe     = (tok)  => api.get('/student/me', { headers: { Authorization: `Bearer ${tok}` } }).then(r => r.data);
 
+// ── Recommender ────────────────────────────────────────────────────────────
+export const getRecommendOptions = ()     => api.get('/recommend/options').then(r => r.data);
+export const getRecommendations  = (data) => api.post('/recommend', data).then(r => r.data);
+
 // ── Admin helpers ───────────────────────────────────────────────────────────
 export const login           = (d)  => api.post('/auth/login', d).then(r => r.data);
 export const getDashboard    = ()   => api.get('/admin/dashboard').then(r => r.data);
