@@ -15,8 +15,12 @@ export default function Login() {
     mutationFn: login,
     onSuccess: (data) => {
       setAuth(data.token, data.user);
-      // Redirect college users to their portal, everyone else to admin
-      navigate(data.user?.role === 'college' ? '/college-portal' : '/admin');
+      // Redirect based on role
+      const role = data.user?.role;
+      const dest = role === 'college' ? '/college-portal'
+                 : role === 'agent'   ? '/agent-portal'
+                 : '/admin';
+      navigate(dest);
     },
   });
 

@@ -8,8 +8,9 @@ const ROLE_COLORS = {
   staff:      'bg-blue-100 text-blue-700 border-blue-200',
   consultant: 'bg-purple-100 text-purple-700 border-purple-200',
   college:    'bg-emerald-100 text-emerald-700 border-emerald-200',
+  agent:      'bg-orange-100 text-orange-700 border-orange-200',
 };
-const ROLE_LABELS = { admin: '🔑 Admin', staff: '🧑‍💼 Staff', consultant: '🎓 Consultant', college: '🏫 College' };
+const ROLE_LABELS = { admin: '🔑 Admin', staff: '🧑‍💼 Staff', consultant: '🎓 Consultant', college: '🏫 College', agent: '🤝 Agent' };
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', phone: '', collegeIds: [], collegeId: '' };
 
@@ -68,6 +69,7 @@ export default function Team() {
   const staffCount = team.filter(u => u.role === 'staff').length;
   const consultantCount = team.filter(u => u.role === 'consultant').length;
   const collegeCount = team.filter(u => u.role === 'college').length;
+  const agentCount = team.filter(u => u.role === 'agent').length;
 
   return (
     <div className="p-6 space-y-5">
@@ -75,7 +77,7 @@ export default function Team() {
         <div>
           <h1 className="text-2xl font-extrabold text-brand">Team Management</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {adminCount} admin · {staffCount} staff · {consultantCount} consultants · {collegeCount} college accounts
+            {adminCount} admin · {staffCount} staff · {consultantCount} consultants · {collegeCount} college · {agentCount} agents
           </p>
         </div>
         <button onClick={() => { setShowForm(true); setEditingId(null); setForm(EMPTY_FORM); }}
@@ -85,12 +87,13 @@ export default function Team() {
       </div>
 
       {/* Role explanation */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           { role: 'admin', icon: '🔑', desc: 'Full access — all leads, colleges, settings & team management' },
           { role: 'staff', icon: '🧑‍💼', desc: 'All leads across all colleges — can update status & notes' },
           { role: 'consultant', icon: '🎓', desc: 'Only leads for their assigned colleges — focused view' },
           { role: 'college', icon: '🏫', desc: 'College self-service — sees own leads, courses & profile only' },
+          { role: 'agent', icon: '🤝', desc: 'Referral agent — refers students, tracks leads & earns commissions' },
         ].map(r => (
           <div key={r.role} className={`rounded-xl p-4 border ${ROLE_COLORS[r.role]}`}>
             <p className="font-bold text-sm">{r.icon} {r.role.charAt(0).toUpperCase() + r.role.slice(1)}</p>
@@ -205,6 +208,7 @@ export default function Team() {
                   <option value="staff">🧑‍💼 Staff — sees all leads</option>
                   <option value="consultant">🎓 Consultant — assigned colleges only</option>
                   <option value="college">🏫 College — self-service portal</option>
+                  <option value="agent">🤝 Agent — referral tracking & commissions</option>
                   <option value="admin">🔑 Admin — full access</option>
                 </select>
               </div>
