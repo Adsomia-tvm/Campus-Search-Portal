@@ -255,9 +255,16 @@ export default function Team() {
               </button>
             </div>
             {(createMutation.error || updateMutation.error) && (
-              <p className="text-red-500 text-sm mt-2">
-                {createMutation.error?.response?.data?.error || updateMutation.error?.response?.data?.error || 'An error occurred'}
-              </p>
+              <div className="text-red-500 text-sm mt-2 bg-red-50 p-2 rounded-lg">
+                {(() => {
+                  const err = createMutation.error || updateMutation.error;
+                  const issues = err?.response?.data?.issues;
+                  if (issues?.length) {
+                    return issues.map((iss, idx) => <p key={idx}>{iss.path?.[iss.path.length - 1]}: {iss.message}</p>);
+                  }
+                  return <p>{err?.response?.data?.error || 'An error occurred'}</p>;
+                })()}
+              </div>
             )}
           </div>
         </div>
