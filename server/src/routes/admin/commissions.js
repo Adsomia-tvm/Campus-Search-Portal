@@ -4,7 +4,6 @@ const { requireStaff, requireAdmin } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { createCommission, updateCommission, idParam } = require('../../middleware/schemas');
 const { logAudit, getIp } = require('../../lib/audit');
-const { notifyCommissionUpdate } = require('../../lib/notify');
 
 router.use(requireStaff);
 
@@ -157,11 +156,6 @@ router.put('/:id', validate(updateCommission), async (req, res, next) => {
       details: data,
       ip: getIp(req),
     });
-
-    // Notify agent of commission status change
-    if (data.status) {
-      notifyCommissionUpdate(commission);
-    }
 
     res.json(commission);
   } catch (err) {

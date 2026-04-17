@@ -203,10 +203,10 @@ const createUser = z.object({
     name: z.string().trim().min(2).max(100),
     email: z.string().email(),
     password: z.string().min(8, 'Password must be at least 8 characters'),
-    role: z.enum(['staff', 'consultant', 'college', 'agent']),
+    role: z.enum(['staff', 'consultant', 'college']),  // admin via setup or DB; student/agent via self-reg
     phone: z.string().max(20).optional().nullable(),
     collegeIds: z.array(positiveInt).optional(),   // for consultant role
-    collegeId: z.preprocess(v => (v === '' || v === null || v === undefined || v === 0) ? undefined : v, positiveInt.optional()),
+    collegeId: positiveInt.optional(),              // for college role
   }),
 });
 

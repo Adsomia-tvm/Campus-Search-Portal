@@ -146,249 +146,104 @@ async function sendWhatsAppText({ to, text, event, entityType, entityId }) {
 
 const CLIENT = () => process.env.CLIENT_URL || 'https://campussearch.in';
 
-// ── Helper: resolve counselor contact details ─────────────────────────────
-async function getCounselorContact(enquiry) {
-  const counselorId = enquiry.counselorId || enquiry.student?.counselorId;
-  if (!counselorId) return null;
-  try {
-    return await prisma.user.findUnique({
-      where: { id: counselorId },
-      select: { name: true, email: true, phone: true },
-    });
-  } catch { return null; }
-}
-
-// ── Helper: resolve agent contact for an enquiry ──────────────────────────
-async function getAgentContact(agentId) {
-  if (!agentId) return null;
-  try {
-    const agent = await prisma.agent.findUnique({
-      where: { id: agentId },
-      include: { user: { select: { name: true, email: true, phone: true } } },
-    });
-    return agent?.user || null;
-  } catch { return null; }
-}
-
-// ── Helper: resolve college contact (portal user or college email) ────────
-async function getCollegeContact(collegeId) {
-  if (!collegeId) return null;
-  try {
-    const college = await prisma.college.findUnique({
-      where: { id: collegeId },
-      select: { email: true, phone: true, name: true },
-    });
-    // Also check if there's a college portal user
-    const portalUser = await prisma.user.findFirst({
-      where: { role: 'college', collegeId, isActive: true },
-      select: { email: true, phone: true, name: true },
-    });
-    return { college, portalUser };
-  } catch { return null; }
-}
-
-const STATUS_EMOJI = {
-  New: '📋', Contacted: '📞', Visited: '🏫', Applied: '📝', Enrolled: '✅', Dropped: '❌',
-};
-
 // ── New Enquiry ────────────────────────────────────────────────────────────
-async function notifyNewEnquiry(enquiry, meta = {}) {
+function notifyNewEnquiry(enquiry, meta = {}) {
   const student = enquiry.student || {};
   const college = enquiry.college || {};
   const course = enquiry.course || {};
   const scoreColor = (meta.leadScore || 0) >= 60 ? '#16a34a' : (meta.leadScore || 0) >= 30 ? '#ca8a04' : '#6b7280';
 
-  const adminHtml = `
-    <h2>New Student Enquiry</h2>
-    <p><b>Student:</b> ${student.name}</p>
-    <p><b>Phone:</b> ${student.phone || '—'}</p>
-    <p><b>Email:</b> ${student.email || '—'}</p>
-    <p><b>College:</b> ${college.name || '—'} (${college.city || ''})</p>
-    <p><b>Course:</b> ${course.name || '—'}</p>
-    <p><b>Category:</b> ${student.preferredCat || '—'}</p>
-    <p><b>Lead Score:</b> <span style="color:${scoreColor};font-weight:bold">${meta.leadScore || 0}/100</span> (${meta.qualificationStatus || 'Unqualified'})</p>
-    ${meta.source ? `<p><b>Source:</b> ${meta.source}</p>` : ''}
-    ${meta.agentName ? `<p><b>Agent:</b> ${meta.agentName}</p>` : ''}
-    <hr/><p><a href="${CLIENT()}/admin/enquiries">Open in Admin Panel</a></p>
-  `;
-
-  const waText = `📋 New Enquiry\n\n👤 ${student.name}\n📞 ${student.phone || '—'}\n🏫 ${college.name || '—'}\n📚 ${course.name || '—'}\n⭐ Score: ${meta.leadScore || 0}/100${meta.source ? `\n📎 Source: ${meta.source}` : ''}`;
-
-  // 1. Email + WhatsApp to admin
+  // Email to admin
   if (process.env.NOTIFY_EMAIL) {
     sendEmail({
       to: process.env.NOTIFY_EMAIL,
-      subject: `New Enquiry — ${student.name} → ${college.name || 'No College'} [Score: ${meta.leadScore || 0}]`,
-      html: adminHtml,
-      event: 'enquiry.new', entityType: 'Enquiry', entityId: enquiry.id,
-    });
-  }
-  if (process.env.WHATSAPP_TOKEN && process.env.NOTIFY_WHATSAPP) {
-    sendWhatsAppText({ to: process.env.NOTIFY_WHATSAPP, text: waText, event: 'enquiry.new', entityType: 'Enquiry', entityId: enquiry.id });
-  }
-
-  // 2. Email + WhatsApp to assigned counselor
-  const counselor = await getCounselorContact(enquiry);
-  if (counselor?.email) {
-    sendEmail({
-      to: counselor.email,
-      subject: `New Lead Assigned — ${student.name} → ${college.name || '—'}`,
+      subject: `New Enquiry — ${student.name} → ${college.name} [Score: ${meta.leadScore || 0}]`,
       html: `
-        <h2>Hi ${counselor.name}, you have a new lead!</h2>
-        <p><b>Student:</b> ${student.name} (${student.phone || '—'})</p>
-        <p><b>College:</b> ${college.name || '—'}</p>
-        <p><b>Course:</b> ${course.name || student.preferredCat || '—'}</p>
+        <h2>New Student Enquiry</h2>
+        <p><b>Student:</b> ${student.name}</p>
+        <p><b>Phone:</b> ${student.phone || '—'}</p>
+        <p><b>Email:</b> ${student.email || '—'}</p>
+        <p><b>College:</b> ${college.name} (${college.city || ''})</p>
+        <p><b>Course:</b> ${course.name || '—'}</p>
+        <p><b>Category:</b> ${student.preferredCat || '—'}</p>
+        <p><b>Lead Score:</b> <span style="color:${scoreColor};font-weight:bold">${meta.leadScore || 0}/100</span> (${meta.qualificationStatus || 'Unqualified'})</p>
+        ${meta.source ? `<p><b>Source:</b> ${meta.source}</p>` : ''}
+        ${meta.agentName ? `<p><b>Agent:</b> ${meta.agentName}</p>` : ''}
         <hr/><p><a href="${CLIENT()}/admin/enquiries">Open in Admin Panel</a></p>
       `,
-      event: 'enquiry.new.counselor', entityType: 'Enquiry', entityId: enquiry.id,
+      event: 'enquiry.new',
+      entityType: 'Enquiry',
+      entityId: enquiry.id,
     });
   }
-  if (counselor?.phone && process.env.WHATSAPP_TOKEN) {
+
+  // Email to college (if college has an email and user)
+  if (college.email) {
+    sendEmail({
+      to: college.email,
+      subject: `New Student Lead — ${student.name} | Campus Search`,
+      html: `
+        <h2>You have a new student lead!</h2>
+        <p><b>Student:</b> ${student.name}</p>
+        <p><b>Phone:</b> ${student.phone || '—'}</p>
+        <p><b>Course Interest:</b> ${course.name || student.preferredCat || '—'}</p>
+        <p><b>City:</b> ${student.city || '—'}</p>
+        <p>Log in to your <a href="${CLIENT()}/college-portal/dashboard">College Portal</a> to view details and manage this lead.</p>
+      `,
+      event: 'enquiry.new.college',
+      entityType: 'Enquiry',
+      entityId: enquiry.id,
+    });
+  }
+
+  // WhatsApp to admin
+  if (process.env.WHATSAPP_TOKEN && process.env.NOTIFY_WHATSAPP) {
     sendWhatsAppText({
-      to: counselor.phone,
-      text: `📋 New Lead Assigned\n\n👤 ${student.name}\n📞 ${student.phone || '—'}\n🏫 ${college.name || '—'}\n📚 ${course.name || '—'}`,
-      event: 'enquiry.new.counselor', entityType: 'Enquiry', entityId: enquiry.id,
+      to: process.env.NOTIFY_WHATSAPP,
+      text: `📋 New Enquiry\n\n👤 ${student.name}\n📞 ${student.phone || '—'}\n🏫 ${college.name}\n📚 ${course.name || '—'}\n⭐ Score: ${meta.leadScore || 0}/100`,
+      event: 'enquiry.new',
+      entityType: 'Enquiry',
+      entityId: enquiry.id,
     });
-  }
-
-  // 3. Email + WhatsApp to college
-  if (college.id) {
-    const contacts = await getCollegeContact(college.id);
-    const collegeEmail = contacts?.portalUser?.email || contacts?.college?.email;
-    const collegePhone = contacts?.portalUser?.phone || contacts?.college?.phone;
-
-    if (collegeEmail) {
-      sendEmail({
-        to: collegeEmail,
-        subject: `New Student Lead — ${student.name} | Campus Search`,
-        html: `
-          <h2>You have a new student lead!</h2>
-          <p><b>Student:</b> ${student.name}</p>
-          <p><b>Phone:</b> ${student.phone || '—'}</p>
-          <p><b>Course Interest:</b> ${course.name || student.preferredCat || '—'}</p>
-          <p><b>City:</b> ${student.city || '—'}</p>
-          <p>Log in to your <a href="${CLIENT()}/college-portal/dashboard">College Portal</a> to view details.</p>
-        `,
-        event: 'enquiry.new.college', entityType: 'Enquiry', entityId: enquiry.id,
-      });
-    }
-    if (collegePhone && process.env.WHATSAPP_TOKEN) {
-      sendWhatsAppText({
-        to: collegePhone,
-        text: `🎓 New Student Lead\n\n👤 ${student.name}\n📞 ${student.phone || '—'}\n📚 ${course.name || student.preferredCat || '—'}\n\nLogin to your College Portal to view details.`,
-        event: 'enquiry.new.college', entityType: 'Enquiry', entityId: enquiry.id,
-      });
-    }
   }
 }
 
 // ── Enquiry Status Change ──────────────────────────────────────────────────
-async function notifyStatusChange(enquiry, oldStatus, newStatus) {
+function notifyStatusChange(enquiry, oldStatus, newStatus) {
   const student = enquiry.student || {};
   const college = enquiry.college || {};
-  const emoji = STATUS_EMOJI[newStatus] || '🔄';
 
-  // 1. Email + WhatsApp to admin (all status changes)
-  if (process.env.NOTIFY_EMAIL) {
-    sendEmail({
-      to: process.env.NOTIFY_EMAIL,
-      subject: `${emoji} Enquiry ${newStatus} — ${student.name} → ${college.name || '—'}`,
-      html: `
-        <h2>Enquiry Status Updated</h2>
-        <p><b>Student:</b> ${student.name} (${student.phone || '—'})</p>
-        <p><b>College:</b> ${college.name || '—'}</p>
-        <p><b>Status:</b> ${oldStatus} → <b>${newStatus}</b></p>
-        <hr/><p><a href="${CLIENT()}/admin/enquiries">Open in Admin Panel</a></p>
-      `,
-      event: 'enquiry.statusChange', entityType: 'Enquiry', entityId: enquiry.id,
-      metadata: { oldStatus, newStatus },
-    });
+  // Email admin on important transitions
+  if (['Enrolled', 'Dropped'].includes(newStatus)) {
+    if (process.env.NOTIFY_EMAIL) {
+      const emoji = newStatus === 'Enrolled' ? '✅' : '❌';
+      sendEmail({
+        to: process.env.NOTIFY_EMAIL,
+        subject: `${emoji} Enquiry ${newStatus} — ${student.name} → ${college.name}`,
+        html: `
+          <h2>Enquiry Status Updated</h2>
+          <p><b>Student:</b> ${student.name} (${student.phone || '—'})</p>
+          <p><b>College:</b> ${college.name}</p>
+          <p><b>Status:</b> ${oldStatus} → <b>${newStatus}</b></p>
+          <hr/><p><a href="${CLIENT()}/admin/enquiries">Open in Admin Panel</a></p>
+        `,
+        event: 'enquiry.statusChange',
+        entityType: 'Enquiry',
+        entityId: enquiry.id,
+        metadata: { oldStatus, newStatus },
+      });
+    }
   }
-  if (process.env.WHATSAPP_TOKEN && process.env.NOTIFY_WHATSAPP) {
+
+  // WhatsApp to admin on enrollment
+  if (newStatus === 'Enrolled' && process.env.WHATSAPP_TOKEN && process.env.NOTIFY_WHATSAPP) {
     sendWhatsAppText({
       to: process.env.NOTIFY_WHATSAPP,
-      text: `${emoji} Status Update\n\n👤 ${student.name}\n🏫 ${college.name || '—'}\n📊 ${oldStatus} → ${newStatus}`,
-      event: 'enquiry.statusChange', entityType: 'Enquiry', entityId: enquiry.id,
+      text: `✅ Enrolled!\n\n👤 ${student.name}\n🏫 ${college.name}\n\nCommission record auto-created.`,
+      event: 'enquiry.enrolled',
+      entityType: 'Enquiry',
+      entityId: enquiry.id,
     });
-  }
-
-  // 2. Notify assigned counselor
-  const counselor = await getCounselorContact(enquiry);
-  if (counselor?.email) {
-    sendEmail({
-      to: counselor.email,
-      subject: `${emoji} Lead ${newStatus} — ${student.name}`,
-      html: `
-        <h2>Lead Status Updated</h2>
-        <p><b>Student:</b> ${student.name} (${student.phone || '—'})</p>
-        <p><b>College:</b> ${college.name || '—'}</p>
-        <p><b>Status:</b> ${oldStatus} → <b>${newStatus}</b></p>
-        <hr/><p><a href="${CLIENT()}/admin/enquiries">Open in Admin Panel</a></p>
-      `,
-      event: 'enquiry.statusChange.counselor', entityType: 'Enquiry', entityId: enquiry.id,
-    });
-  }
-  if (counselor?.phone && process.env.WHATSAPP_TOKEN) {
-    sendWhatsAppText({
-      to: counselor.phone,
-      text: `${emoji} Lead Update\n\n👤 ${student.name}\n📊 ${oldStatus} → ${newStatus}\n🏫 ${college.name || '—'}`,
-      event: 'enquiry.statusChange.counselor', entityType: 'Enquiry', entityId: enquiry.id,
-    });
-  }
-
-  // 3. Notify college on important transitions (Applied, Enrolled, Dropped)
-  if (['Applied', 'Enrolled', 'Dropped'].includes(newStatus) && college.id) {
-    const contacts = await getCollegeContact(college.id);
-    const collegeEmail = contacts?.portalUser?.email || contacts?.college?.email;
-    const collegePhone = contacts?.portalUser?.phone || contacts?.college?.phone;
-
-    if (collegeEmail) {
-      sendEmail({
-        to: collegeEmail,
-        subject: `${emoji} Student ${newStatus} — ${student.name} | Campus Search`,
-        html: `
-          <h2>Student Status Update</h2>
-          <p><b>Student:</b> ${student.name}</p>
-          <p><b>Status:</b> ${oldStatus} → <b>${newStatus}</b></p>
-          <p>Log in to your <a href="${CLIENT()}/college-portal/dashboard">College Portal</a> for details.</p>
-        `,
-        event: 'enquiry.statusChange.college', entityType: 'Enquiry', entityId: enquiry.id,
-      });
-    }
-    if (collegePhone && process.env.WHATSAPP_TOKEN) {
-      sendWhatsAppText({
-        to: collegePhone,
-        text: `${emoji} Student Update\n\n👤 ${student.name}\n📊 ${oldStatus} → ${newStatus}`,
-        event: 'enquiry.statusChange.college', entityType: 'Enquiry', entityId: enquiry.id,
-      });
-    }
-  }
-
-  // 4. Notify agent when their referral status changes
-  if (enquiry.agentId) {
-    const agentContact = await getAgentContact(enquiry.agentId);
-    if (agentContact?.email) {
-      sendEmail({
-        to: agentContact.email,
-        subject: `${emoji} Your referral ${student.name} is now ${newStatus} | Campus Search`,
-        html: `
-          <h2>Hi ${agentContact.name}, your referral has been updated!</h2>
-          <p><b>Student:</b> ${student.name}</p>
-          <p><b>College:</b> ${college.name || '—'}</p>
-          <p><b>Status:</b> ${oldStatus} → <b>${newStatus}</b></p>
-          ${newStatus === 'Enrolled' ? '<p>🎉 Commission will be calculated shortly!</p>' : ''}
-          <hr/><p><a href="${CLIENT()}/agent-portal/leads">View in Agent Portal</a></p>
-        `,
-        event: 'enquiry.statusChange.agent', entityType: 'Enquiry', entityId: enquiry.id,
-      });
-    }
-    if (agentContact?.phone && process.env.WHATSAPP_TOKEN) {
-      sendWhatsAppText({
-        to: agentContact.phone,
-        text: `${emoji} Referral Update\n\n👤 ${student.name}\n🏫 ${college.name || '—'}\n📊 ${oldStatus} → ${newStatus}${newStatus === 'Enrolled' ? '\n\n🎉 Commission will be calculated shortly!' : ''}`,
-        event: 'enquiry.statusChange.agent', entityType: 'Enquiry', entityId: enquiry.id,
-      });
-    }
   }
 }
 
@@ -397,58 +252,20 @@ function notifyAgentReferral(enquiry, agentName) {
   const student = enquiry.student || {};
   const college = enquiry.college || {};
 
-  // Email + WhatsApp to admin
   if (process.env.NOTIFY_EMAIL) {
     sendEmail({
       to: process.env.NOTIFY_EMAIL,
-      subject: `🤝 Agent Referral — ${agentName} → ${student.name} → ${college.name || 'No College'}`,
+      subject: `Agent Referral — ${agentName} → ${student.name} → ${college.name}`,
       html: `
         <h2>New Agent Referral</h2>
         <p><b>Agent:</b> ${agentName}</p>
         <p><b>Student:</b> ${student.name} (${student.phone || '—'})</p>
-        <p><b>College:</b> ${college.name || 'Pending assignment'}</p>
+        <p><b>College:</b> ${college.name}</p>
         <hr/><p><a href="${CLIENT()}/admin/enquiries">Open in Admin Panel</a></p>
       `,
-      event: 'agent.referral', entityType: 'Enquiry', entityId: enquiry.id,
-    });
-  }
-  if (process.env.WHATSAPP_TOKEN && process.env.NOTIFY_WHATSAPP) {
-    sendWhatsAppText({
-      to: process.env.NOTIFY_WHATSAPP,
-      text: `🤝 Agent Referral\n\n🧑‍💼 ${agentName}\n👤 ${student.name}\n📞 ${student.phone || '—'}\n🏫 ${college.name || 'Pending assignment'}`,
-      event: 'agent.referral', entityType: 'Enquiry', entityId: enquiry.id,
-    });
-  }
-}
-
-// ── Commission Status → Agent ─────────────────────────────────────────────
-async function notifyCommissionUpdate(commission) {
-  if (!commission.agentId) return;
-  const agentContact = await getAgentContact(commission.agentId);
-  if (!agentContact) return;
-
-  const amount = commission.agentAmount || commission.amount || 0;
-  const emoji = commission.status === 'Received' ? '💰' : commission.status === 'Written Off' ? '❌' : '⏳';
-
-  if (agentContact.email) {
-    sendEmail({
-      to: agentContact.email,
-      subject: `${emoji} Commission ${commission.status} — ₹${amount.toLocaleString('en-IN')} | Campus Search`,
-      html: `
-        <h2>Hi ${agentContact.name}, commission update!</h2>
-        <p><b>Amount:</b> ₹${amount.toLocaleString('en-IN')}</p>
-        <p><b>Status:</b> ${commission.status}</p>
-        ${commission.status === 'Received' ? '<p>This amount will be included in your next payout.</p>' : ''}
-        <hr/><p><a href="${CLIENT()}/agent-portal/commissions">View in Agent Portal</a></p>
-      `,
-      event: 'commission.update', entityType: 'Commission', entityId: commission.id,
-    });
-  }
-  if (agentContact.phone && process.env.WHATSAPP_TOKEN) {
-    sendWhatsAppText({
-      to: agentContact.phone,
-      text: `${emoji} Commission ${commission.status}\n\nAmount: ₹${amount.toLocaleString('en-IN')}${commission.status === 'Received' ? '\nWill be included in your next payout.' : ''}`,
-      event: 'commission.update', entityType: 'Commission', entityId: commission.id,
+      event: 'agent.referral',
+      entityType: 'Enquiry',
+      entityId: enquiry.id,
     });
   }
 }
@@ -458,16 +275,18 @@ function notifyPayoutUpdate(payout, agentEmail, agentPhone, agentName) {
   if (payout.status === 'Paid' && agentEmail) {
     sendEmail({
       to: agentEmail,
-      subject: `💰 Payment of ₹${payout.amount?.toLocaleString('en-IN')} processed | Campus Search`,
+      subject: `Payment of ₹${payout.amount?.toLocaleString('en-IN')} processed | Campus Search`,
       html: `
         <h2>Hi ${agentName},</h2>
         <p>Your payout of <b>₹${payout.amount?.toLocaleString('en-IN')}</b> has been processed.</p>
         ${payout.utrNumber ? `<p><b>UTR:</b> ${payout.utrNumber}</p>` : ''}
         ${payout.paymentMethod ? `<p><b>Method:</b> ${payout.paymentMethod}</p>` : ''}
-        <p>Check your bank account for the credit. You can view your full earnings history on your <a href="${CLIENT()}/agent-portal">Agent Dashboard</a>.</p>
+        <p>Check your bank account for the credit. You can view your full earnings history on your <a href="${CLIENT()}/agent/dashboard">Agent Dashboard</a>.</p>
         <p>Thank you for partnering with Campus Search!</p>
       `,
-      event: 'payout.paid', entityType: 'AgentPayout', entityId: payout.id,
+      event: 'payout.paid',
+      entityType: 'AgentPayout',
+      entityId: payout.id,
     });
   }
 
@@ -475,94 +294,10 @@ function notifyPayoutUpdate(payout, agentEmail, agentPhone, agentName) {
     sendWhatsAppText({
       to: agentPhone,
       text: `💰 Payment Processed!\n\nHi ${agentName}, ₹${payout.amount?.toLocaleString('en-IN')} has been transferred to your account.${payout.utrNumber ? `\nUTR: ${payout.utrNumber}` : ''}\n\nThank you for partnering with Campus Search!`,
-      event: 'payout.paid', entityType: 'AgentPayout', entityId: payout.id,
+      event: 'payout.paid',
+      entityType: 'AgentPayout',
+      entityId: payout.id,
     });
-  }
-}
-
-// ── Follow-up Reminder ────────────────────────────────────────────────────
-// Called by cron job to notify counselors/admin about upcoming follow-ups
-async function processFollowUpReminders() {
-  const now = new Date();
-  const endOfDay = new Date(now);
-  endOfDay.setHours(23, 59, 59, 999);
-
-  try {
-    const dueFollowUps = await prisma.enquiry.findMany({
-      where: {
-        followUpDate: { lte: endOfDay, gte: now },
-        status: { notIn: ['Enrolled', 'Dropped'] },
-      },
-      select: {
-        id: true, status: true, followUpDate: true, notes: true,
-        student: { select: { name: true, phone: true } },
-        college: { select: { name: true } },
-        counselor: { select: { name: true, email: true, phone: true } },
-      },
-      take: 100,
-    });
-
-    for (const enq of dueFollowUps) {
-      const student = enq.student || {};
-      const college = enq.college || {};
-      const counselor = enq.counselor;
-      const time = enq.followUpDate ? new Date(enq.followUpDate).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Today';
-
-      // Notify counselor if assigned
-      if (counselor?.email) {
-        sendEmail({
-          to: counselor.email,
-          subject: `⏰ Follow-up Due — ${student.name} (${college.name || '—'})`,
-          html: `
-            <h2>Follow-up Reminder</h2>
-            <p><b>Student:</b> ${student.name} (${student.phone || '—'})</p>
-            <p><b>College:</b> ${college.name || '—'}</p>
-            <p><b>Status:</b> ${enq.status}</p>
-            <p><b>Due:</b> ${time}</p>
-            ${enq.notes ? `<p><b>Notes:</b> ${enq.notes}</p>` : ''}
-            <hr/><p><a href="${CLIENT()}/admin/enquiries">Open in Admin Panel</a></p>
-          `,
-          event: 'followup.reminder', entityType: 'Enquiry', entityId: enq.id,
-        });
-      }
-      if (counselor?.phone && process.env.WHATSAPP_TOKEN) {
-        sendWhatsAppText({
-          to: counselor.phone,
-          text: `⏰ Follow-up Due\n\n👤 ${student.name}\n📞 ${student.phone || '—'}\n🏫 ${college.name || '—'}\n📊 Status: ${enq.status}\n🕐 ${time}`,
-          event: 'followup.reminder', entityType: 'Enquiry', entityId: enq.id,
-        });
-      }
-
-      // Also notify admin
-      if (process.env.NOTIFY_EMAIL) {
-        sendEmail({
-          to: process.env.NOTIFY_EMAIL,
-          subject: `⏰ Follow-up Due — ${student.name} → ${college.name || '—'}`,
-          html: `
-            <h2>Follow-up Reminder</h2>
-            <p><b>Student:</b> ${student.name} (${student.phone || '—'})</p>
-            <p><b>College:</b> ${college.name || '—'}</p>
-            <p><b>Counselor:</b> ${counselor?.name || 'Unassigned'}</p>
-            <p><b>Status:</b> ${enq.status}</p>
-            <p><b>Due:</b> ${time}</p>
-            <hr/><p><a href="${CLIENT()}/admin/enquiries">Open in Admin Panel</a></p>
-          `,
-          event: 'followup.reminder', entityType: 'Enquiry', entityId: enq.id,
-        });
-      }
-      if (process.env.WHATSAPP_TOKEN && process.env.NOTIFY_WHATSAPP) {
-        sendWhatsAppText({
-          to: process.env.NOTIFY_WHATSAPP,
-          text: `⏰ Follow-up Due\n\n👤 ${student.name}\n📞 ${student.phone || '—'}\n🏫 ${college.name || '—'}\n🧑‍💼 ${counselor?.name || 'Unassigned'}\n📊 ${enq.status}`,
-          event: 'followup.reminder', entityType: 'Enquiry', entityId: enq.id,
-        });
-      }
-    }
-
-    return dueFollowUps.length;
-  } catch (err) {
-    console.error('[notify] Follow-up reminders failed:', err.message);
-    return 0;
   }
 }
 
@@ -574,7 +309,5 @@ module.exports = {
   notifyNewEnquiry,
   notifyStatusChange,
   notifyAgentReferral,
-  notifyCommissionUpdate,
   notifyPayoutUpdate,
-  processFollowUpReminders,
 };

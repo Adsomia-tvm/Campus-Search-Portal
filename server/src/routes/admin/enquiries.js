@@ -4,7 +4,7 @@ const { requireTeamMember } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { createEnquiry, updateEnquiry, idParam } = require('../../middleware/schemas');
 const { deriveQualification } = require('../../lib/leadScore');
-const { notifyStatusChange } = require('../../lib/notify');
+const { notifyNewEnquiry, notifyStatusChange } = require('../../lib/notify');
 
 router.use(requireTeamMember);
 
@@ -99,8 +99,12 @@ router.post('/', validate(createEnquiry), async (req, res, next) => {
   try {
     const enquiry = await prisma.enquiry.create({
       data: pickEnquiryCreate(req.body),
-      include: { student: true, college: { select: { name: true } } },
+      include: { student: true, college: { select: { id: true, name: true, city: true } }, course: { select: { name: true } } },
     });
+
+    // Fire notification (fire-and-forget)
+    notifyNewEnquiry(enquiry, { source: req.body.source || 'Admin' });
+
     res.status(201).json(enquiry);
   } catch (err) {
     next(err);

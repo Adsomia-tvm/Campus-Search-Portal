@@ -115,7 +115,7 @@ router.put('/', async (req, res, next) => {
       prisma.systemSetting.update({
         where: { key },
         data: { value: String(settings[key]), updatedBy: req.user.id },
-      }),
+      })
     );
     const results = await prisma.$transaction(updates);
 

@@ -13,15 +13,7 @@ export default function Login() {
 
   const mutation = useMutation({
     mutationFn: login,
-    onSuccess: (data) => {
-      setAuth(data.token, data.user);
-      // Redirect based on role
-      const role = data.user?.role;
-      const dest = role === 'college' ? '/college-portal'
-                 : role === 'agent'   ? '/agent-portal'
-                 : '/admin';
-      navigate(dest);
-    },
+    onSuccess: (data) => { setAuth(data.token, data.user); navigate('/admin'); },
   });
 
   return (
@@ -30,7 +22,7 @@ export default function Login() {
         <div className="text-center mb-8">
           <div className="text-5xl mb-3">🎓</div>
           <h1 className="text-2xl font-extrabold text-brand">Campus Search</h1>
-          <p className="text-gray-400 text-sm mt-1">Login to your account</p>
+          <p className="text-gray-400 text-sm mt-1">Admin Panel Login</p>
         </div>
 
         <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-4" autoComplete="off">

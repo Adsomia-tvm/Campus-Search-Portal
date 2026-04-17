@@ -60,12 +60,6 @@ router.post('/', requireAdmin, validate(createUser), async (req, res, next) => {
       userData.collegeId = Number(req.body.collegeId);
     }
 
-    // Agent: auto-create agent profile with referral code
-    if (role === 'agent') {
-      const code = 'AGT-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-      userData.agent = { create: { referralCode: code, commissionRate: 5.0 } };
-    }
-
     const user = await prisma.user.create({ data: userData, select: USER_SELECT });
     res.status(201).json(user);
   } catch (err) {
