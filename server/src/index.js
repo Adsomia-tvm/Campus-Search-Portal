@@ -53,6 +53,10 @@ app.use(cors({
   credentials: true,
 }));
 
+// Performance middleware
+const { responseTime } = require('./middleware/perf');
+app.use(responseTime);
+
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
@@ -78,6 +82,7 @@ app.use(express.static(_distPath));
 app.use('/api/colleges',      require('./routes/public/colleges'));
 app.use('/api/enquiries',     enquiryLimiter, require('./routes/public/enquiries'));
 app.use('/api/whatsapp',     require('./routes/public/whatsapp'));
+app.use('/api/razorpay',     require('./routes/public/razorpayWebhook'));
 app.use('/api/career-leads',  enquiryLimiter, require('./routes/public/careerLeads'));
 app.use('/api/categories',    require('./routes/public/categories'));
 app.use('/api/student',       enquiryLimiter, require('./routes/public/studentAuth'));
@@ -111,6 +116,8 @@ app.use('/api/admin/tiers',         require('./routes/admin/tiers'));
 app.use('/api/admin/bulk',          require('./routes/admin/bulk'));
 app.use('/api/admin/audit',         require('./routes/admin/audit'));
 app.use('/api/admin/settings',      require('./routes/admin/settings'));
+app.use('/api/admin/payments',      require('./routes/admin/payments'));
+app.use('/api/admin/crm',           require('./routes/admin/crm'));
 
 // ── Health check (safe for production — no env/db details leaked) ────────────
 app.get('/api/health', async (req, res) => {
