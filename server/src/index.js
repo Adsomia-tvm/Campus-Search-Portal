@@ -22,7 +22,7 @@ app.use((req, res, next) => {
     "font-src 'self' https://fonts.gstatic.com; " +
     "img-src 'self' data: https:; " +
     "connect-src 'self' https://campussearch.in https://www.campussearch.in; " +
-    "frame-ancestors 'none';"
+    "frame-ancestors 'none';",
   );
   next();
 });
@@ -82,6 +82,7 @@ app.use(express.static(_distPath));
 app.use('/api/colleges',      require('./routes/public/colleges'));
 app.use('/api/enquiries',     enquiryLimiter, require('./routes/public/enquiries'));
 app.use('/api/whatsapp',     require('./routes/public/whatsapp'));
+app.use('/api/bot',          require('./routes/public/whatsapp')); // Bot test endpoint
 app.use('/api/razorpay',     require('./routes/public/razorpayWebhook'));
 app.use('/api/career-leads',  enquiryLimiter, require('./routes/public/careerLeads'));
 app.use('/api/categories',    require('./routes/public/categories'));
@@ -120,6 +121,23 @@ app.use('/api/admin/payments',      require('./routes/admin/payments'));
 app.use('/api/admin/crm',           require('./routes/admin/crm'));
 
 // ── Health check (safe for production — no env/db details leaked) ────────────
+// ── Cron: follow-up reminders (called by Vercel Cron or external scheduler) ──
+app.get('/api/cron/follow-ups', async (req, res) => {
+  // Simple auth: check cron secret or admin token
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = req.headers.authorization;
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const { processFollowUpReminders } = require('./lib/notify');
+    const count = await processFollowUpReminders();
+    res.json({ ok: true, reminders: count, time: new Date().toISOString() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/health', async (req, res) => {
   try {
     const prisma = require('./lib/prisma');
@@ -276,7 +294,7 @@ app.get('/college/:id', async (req, res) => {
         return res.redirect(301, `/colleges/${college.citySlug}/${college.slug}`);
       }
     }
-  } catch {}
+  } catch { /* slug lookup failed — fall through to SPA */ }
   // Fallback — serve SPA for colleges without slugs yet
   res.sendFile(_path.join(_distPath, 'index.html'));
 });
@@ -335,6 +353,15 @@ app.use(errorHandler);
 if (require.main === module) {
   const PORT = process.env.PORT || 4000;
   app.listen(PORT, () => console.log(`🚀 Campus Search API running on port ${PORT}`));
+
+  // Follow-up reminder cron — runs every hour
+  const { processFollowUpReminders } = require('./lib/notify');
+  setInterval(async () => {
+    try {
+      const count = await processFollowUpReminders();
+      if (count > 0) console.log(`⏰ Sent ${count} follow-up reminders`);
+    } catch (e) { console.warn('Follow-up reminder failed:', e.message); }
+  }, 60 * 60 * 1000); // every 1 hour
 
   // Cache warm-up on local startup
   const { staticCache } = require('./cache');

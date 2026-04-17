@@ -20,7 +20,23 @@ const Colleges      = lazy(() => import('./pages/admin/Colleges'));
 const Commissions   = lazy(() => import('./pages/admin/Commissions'));
 const Reports       = lazy(() => import('./pages/admin/Reports'));
 const Team          = lazy(() => import('./pages/admin/Team'));
+const BotTest       = lazy(() => import('./pages/admin/BotTest'));
 const AdminLayout   = lazy(() => import('./components/AdminLayout'));
+
+// College portal pages — lazy loaded
+const CollegeLayout     = lazy(() => import('./components/CollegeLayout'));
+const CollegeDashboard  = lazy(() => import('./pages/college/Dashboard'));
+const CollegeEnquiries  = lazy(() => import('./pages/college/Enquiries'));
+const CollegeCourses    = lazy(() => import('./pages/college/Courses'));
+const CollegeProfile    = lazy(() => import('./pages/college/Profile'));
+
+// Agent portal pages — lazy loaded
+const AgentLayout       = lazy(() => import('./components/AgentLayout'));
+const AgentDashboard    = lazy(() => import('./pages/agent/Dashboard'));
+const AgentLeads        = lazy(() => import('./pages/agent/Leads'));
+const AgentRefer        = lazy(() => import('./pages/agent/Refer'));
+const AgentCommissions  = lazy(() => import('./pages/agent/Commissions'));
+const AgentProfile      = lazy(() => import('./pages/agent/Profile'));
 
 function LoadingFallback() {
   return (
@@ -34,6 +50,20 @@ function PrivateRoute({ children, roles }) {
   const { token, user } = useAuthStore();
   if (!token) return <Navigate to="/admin/login" replace />;
   if (roles && user && !roles.includes(user.role)) return <Navigate to="/admin" replace />;
+  return children;
+}
+
+function CollegeRoute({ children }) {
+  const { token, user } = useAuthStore();
+  if (!token) return <Navigate to="/admin/login" replace />;
+  if (user?.role !== 'college') return <Navigate to="/admin" replace />;
+  return children;
+}
+
+function AgentRoute({ children }) {
+  const { token, user } = useAuthStore();
+  if (!token) return <Navigate to="/admin/login" replace />;
+  if (user?.role !== 'agent') return <Navigate to="/admin" replace />;
   return children;
 }
 
@@ -61,6 +91,24 @@ export default function App() {
         <Route path="commissions" element={<PrivateRoute roles={['admin','staff']}><Commissions /></PrivateRoute>} />
         <Route path="reports"     element={<PrivateRoute roles={['admin','staff']}><Reports /></PrivateRoute>} />
         <Route path="team"        element={<PrivateRoute roles={['admin']}><Team /></PrivateRoute>} />
+        <Route path="bot-test"    element={<PrivateRoute roles={['admin','staff']}><BotTest /></PrivateRoute>} />
+      </Route>
+
+      {/* College Portal */}
+      <Route path="/college-portal" element={<CollegeRoute><CollegeLayout /></CollegeRoute>}>
+        <Route index              element={<CollegeDashboard />} />
+        <Route path="enquiries"   element={<CollegeEnquiries />} />
+        <Route path="courses"     element={<CollegeCourses />} />
+        <Route path="profile"     element={<CollegeProfile />} />
+      </Route>
+
+      {/* Agent Portal */}
+      <Route path="/agent-portal" element={<AgentRoute><AgentLayout /></AgentRoute>}>
+        <Route index              element={<AgentDashboard />} />
+        <Route path="leads"       element={<AgentLeads />} />
+        <Route path="refer"       element={<AgentRefer />} />
+        <Route path="commissions" element={<AgentCommissions />} />
+        <Route path="profile"     element={<AgentProfile />} />
       </Route>
     </Routes>
     </Suspense>

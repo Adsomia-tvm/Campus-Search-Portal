@@ -10,6 +10,7 @@ const NAV = [
   { to: '/admin/commissions', label: 'Commissions',  icon: '💰',               roles: ['admin','staff'] },
   { to: '/admin/reports',     label: 'Reports',      icon: '📈',               roles: ['admin','staff'] },
   { to: '/admin/team',        label: 'Team',         icon: '👤',               roles: ['admin'] },
+  { to: '/admin/bot-test',    label: 'Bot Test',     icon: '🤖',               roles: ['admin','staff'] },
 ];
 
 export default function AdminLayout() {
