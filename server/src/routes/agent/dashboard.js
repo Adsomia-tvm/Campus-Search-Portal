@@ -335,7 +335,7 @@ router.post('/refer', async (req, res, next) => {
     const agent = await prisma.agent.findUnique({ where: { userId: req.user.id }, select: { id: true } });
     if (!agent) return res.status(404).json({ error: 'Agent profile not found' });
 
-    const { studentName, studentPhone, studentEmail, collegeId, courseId, preferredCat, notes } = req.body;
+    const { studentName, studentPhone, studentEmail, collegeId, courseId, preferredCat, source, notes } = req.body;
 
     if (!studentName || !studentPhone) {
       return res.status(400).json({ error: 'studentName and studentPhone are required' });
@@ -363,7 +363,7 @@ router.post('/refer', async (req, res, next) => {
         phone: cleanPhone,
         email: studentEmail?.trim() || null,
         preferredCat: preferredCat || null,
-        source: 'Agent',
+        source: source || 'Agent',
       },
       update: {
         ...(studentEmail?.trim() && { email: studentEmail.trim() }),

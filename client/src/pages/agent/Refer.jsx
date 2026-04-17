@@ -9,7 +9,7 @@ export default function AgentRefer() {
   const navigate = useNavigate();
   const [form, setForm] = useState({
     studentName: '', studentPhone: '', studentEmail: '',
-    collegeId: '', courseId: '', preferredCat: '', notes: '',
+    collegeId: '', courseId: '', preferredCat: '', source: '', notes: '',
   });
   const [collegeSearch, setCollegeSearch] = useState('');
   const [selectedCollege, setSelectedCollege] = useState(null);
@@ -28,7 +28,7 @@ export default function AgentRefer() {
     onSuccess: (data) => {
       setSuccess(data);
       setSelectedCollege(null);
-      setForm({ studentName: '', studentPhone: '', studentEmail: '', collegeId: '', courseId: '', preferredCat: '', notes: '' });
+      setForm({ studentName: '', studentPhone: '', studentEmail: '', collegeId: '', courseId: '', preferredCat: '', source: '', notes: '' });
     },
   });
 
@@ -98,6 +98,16 @@ export default function AgentRefer() {
                   ))}
                 </select>
               </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">Referral Source</label>
+              <select className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500"
+                value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))}>
+                <option value="">Select source...</option>
+                {['WhatsApp', 'Meta Ads', 'Google Ads', 'Referral', 'Cold Pitch', 'Webinar', 'Walk-in', 'Phone', 'Direct', 'Instagram', 'YouTube', 'Education Fair', 'Other'].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
             </div>
           </div>
 
