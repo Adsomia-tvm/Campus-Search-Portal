@@ -13,7 +13,20 @@ const { notifyNewEnquiry } = require('../notify');
 const { aiReply } = require('./ai');
 
 // ── City list (top cities from DB, can be extended) ─────────────────────────
-const TOP_CITIES = ['Bangalore', 'Mangalore', 'Mysore', 'Kochi', 'Chennai', 'Coimbatore', 'Trivandrum', 'Calicut', 'Hubli', 'Manipal'];
+const TOP_CITIES = ['Bengaluru', 'Mangaluru', 'Mysuru', 'Kochi', 'Chennai', 'Coimbatore', 'Thiruvananthapuram', 'Kozhikode', 'Hubballi', 'Manipal'];
+
+// Alias map: common spellings → DB city name
+const CITY_ALIASES = {
+  'bangalore': 'Bengaluru', 'banglore': 'Bengaluru', 'blr': 'Bengaluru',
+  'mangalore': 'Mangaluru', 'mangalor': 'Mangaluru',
+  'mysore': 'Mysuru', 'mysor': 'Mysuru',
+  'trivandrum': 'Thiruvananthapuram', 'tvm': 'Thiruvananthapuram',
+  'calicut': 'Kozhikode', 'kozikode': 'Kozhikode',
+  'cochin': 'Kochi', 'ernakulam': 'Kochi',
+  'madras': 'Chennai',
+  'hubli': 'Hubballi', 'dharwad': 'Hubballi',
+  'tumkur': 'Tumakuru', 'shimoga': 'Shivamogga',
+};
 
 // ── Course categories ───────────────────────────────────────────────────────
 const COURSE_CATS = ['BBA / BCA / BCom', 'MBA / MCA / MCom', 'Engineering (BE/BTech)', 'Medical / Nursing', 'Allied Health Sciences', 'Arts & Science', 'Law', 'Pharmacy', 'Diploma'];
@@ -51,9 +64,9 @@ async function processMessage(phone, message) {
 
   const session = getSession(phone);
 
-  // ── AI shortcut: if text looks like a natural question (>4 words), try AI first from any state
-  const wordCount = text.split(/\s+/).length;
-  if (wordCount >= 4 && session.state === 'MAIN_MENU') {
+  // ── AI shortcut: natural language questions go to AI counselor from main menu
+  if (session.state === 'MAIN_MENU' && text.length > 5 && isNaN(text)) {
+    // Not a menu number — treat as natural conversation
     const aiResponse = await aiReply(text, session.history || []);
     if (aiResponse) {
       addToHistory(phone, 'bot', aiResponse);
@@ -169,16 +182,21 @@ async function handleSearchCity(phone, text, lower, session) {
   if (num >= 1 && num <= TOP_CITIES.length) {
     city = TOP_CITIES[num - 1];
   } else {
-    // Try to match city name from DB
-    const match = await prisma.college.findFirst({
-      where: { city: { contains: text, mode: 'insensitive' }, isActive: true },
-      select: { city: true },
-    });
-    if (match) city = match.city;
-    else {
-      // Check if they typed something close
-      const fuzzy = TOP_CITIES.find(c => c.toLowerCase().includes(lower));
-      if (fuzzy) city = fuzzy;
+    // Check alias first (bangalore → Bengaluru)
+    const alias = CITY_ALIASES[lower];
+    if (alias) {
+      city = alias;
+    } else {
+      // Try to match city name from DB
+      const match = await prisma.college.findFirst({
+        where: { city: { contains: text, mode: 'insensitive' }, isActive: true },
+        select: { city: true },
+      });
+      if (match) city = match.city;
+      else {
+        const fuzzy = TOP_CITIES.find(c => c.toLowerCase().includes(lower));
+        if (fuzzy) city = fuzzy;
+      }
     }
   }
 

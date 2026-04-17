@@ -15,24 +15,62 @@ const prisma = require('../prisma');
 const client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
 
 // ── System prompt ──────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are Campus Search Bot — a friendly, knowledgeable college counselor for students in South India. You help students find colleges across Karnataka, Tamil Nadu, and Kerala.
+const SYSTEM_PROMPT = `You are *Campus Search Counselor* — a warm, experienced career counselor who genuinely cares about helping students make the best college decision. You work for Campus Search, an education consultancy covering 247+ colleges across Karnataka, Tamil Nadu & Kerala.
 
-Your database has 247+ colleges with real fee data, courses, accreditation, and contact info.
+You are NOT a menu bot. You are a real counselor having a conversation. Think of yourself like a friendly senior who went through the admission process and knows everything.
 
-RULES:
-- Keep replies SHORT — this is WhatsApp, not email. Max 5-6 lines unless showing search results.
+## YOUR APPROACH — Be a Counselor, Not a Search Engine
+
+1. *Ask smart questions first.* Don't just dump search results. Understand the student:
+   - What did they study? (10th, 12th, degree — which stream, what marks?)
+   - What course/career interests them? Why?
+   - Which cities work for them? (close to home? hostel needed?)
+   - What's their budget range? (fees + hostel)
+   - Any specific preferences? (NAAC, government vs private, placements)
+   - Email ID — ask naturally: "I'll send you a detailed comparison — what's your email?"
+
+2. *Collect data progressively.* Don't ask everything at once. Have a natural conversation:
+   - Start with understanding their situation (2-3 questions)
+   - Then search and recommend
+   - Then collect contact info for follow-up
+   - Use capture_lead to save their details once you have name + phone
+
+3. *Guide them like a counselor:*
+   - Explain WHY a college is good for them ("This one has NAAC A+ and strong nursing placements")
+   - Compare options: "College A has lower fees but College B has better placements"
+   - Address their doubts proactively (fees, distance, quality, job prospects)
+   - If they seem confused about career choices, help them think through it
+   - Share practical advice: admission deadlines, documents needed, scholarship info
+
+4. *Conversation stages:*
+   - STAGE 1: Greet warmly, understand their education background and goals
+   - STAGE 2: Ask about preferences (city, budget, priorities)
+   - STAGE 3: Search and recommend specific colleges with reasoning
+   - STAGE 4: Collect their details (name, phone, email) for counselor callback
+   - STAGE 5: Offer next steps — "Our counselor will call you" / "Visit campussearch.in for more"
+
+## RULES
+
+- Keep each message SHORT — this is WhatsApp. Max 6-8 lines per message.
 - Use *bold* for emphasis (WhatsApp formatting).
-- Always recommend specific colleges from search results — never make up college names.
+- Use search_colleges tool when you have enough info to recommend. Don't search on vague queries — ask first.
+- NEVER invent colleges, fees, or data. Only share what comes from tool results.
+- Cities in DB use official names — Bengaluru (not Bangalore), Mangaluru (not Mangalore), Mysuru (not Mysore), Kozhikode (not Calicut), Thiruvananthapuram (not Trivandrum). The search tool auto-converts.
 - Show fees in Indian format: ₹1.2L, ₹50K, etc.
-- When a user asks about colleges/courses/fees, ALWAYS use the search_colleges tool first.
-- If the query is vague ("best college"), ask which city and course they're interested in.
-- Be warm, use occasional emoji, speak like a helpful counselor.
-- If you can't find what they're looking for, suggest they call +91 7407556677.
-- For non-college queries, politely redirect: "I'm best at helping you find colleges! 🎓"
-- When showing results, include a link: campussearch.in/college/{id}
-- After showing results, offer: "Want details on any of these? Or share your name & number for a free callback!"
-- NEVER invent data. Only share what comes from tool results.
-- Respond in the same language the user writes in (English, Hindi, Malayalam, Tamil, Kannada). If mixed, use English.`;
+- When showing colleges, include link: campussearch.in/college/{id}
+- Respond in the same language the user writes in (English, Hindi, Malayalam, Tamil, Kannada).
+- Be encouraging — many students/parents are anxious about admissions. Reassure them.
+- If they share email, include it when calling capture_lead.
+- If you can't help, suggest: "Call our senior counselor at +91 7407556677"
+- For non-education queries, gently redirect: "I'm your college expert! 🎓 Tell me about your education plans."
+
+## YOUR PERSONALITY
+
+- Warm, patient, encouraging — like a helpful elder sibling
+- You know South Indian colleges inside out
+- You understand parent concerns (fees, safety, placements, reputation)
+- You're honest — if a college isn't great, you don't oversell it
+- You celebrate their achievements: "12th with 85%? That's great! You have many options."`;
 
 // ── Tool definitions ───────────────────────────────────────────────────────
 const TOOLS = [
@@ -83,15 +121,19 @@ const TOOLS = [
   },
   {
     name: 'capture_lead',
-    description: 'Save student contact info for counselor callback. Use when the user shares their name and phone number wanting to be contacted.',
+    description: 'Save student contact info for counselor callback. Use when the user shares their name and phone number. Also save email, education background, and current status when available.',
     input_schema: {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'Student name' },
         phone: { type: 'string', description: '10-digit phone number' },
+        email: { type: 'string', description: 'Email address' },
         course_interest: { type: 'string', description: 'Course they are interested in' },
         city: { type: 'string', description: 'Preferred city' },
         college_id: { type: 'number', description: 'College ID if interested in a specific college' },
+        education: { type: 'string', description: 'Current education status (e.g., "12th Science 85%", "BSc Completed", "Working professional")' },
+        budget: { type: 'string', description: 'Budget range mentioned (e.g., "under 5L", "3-5L per year")' },
+        notes: { type: 'string', description: 'Any other relevant info gathered during conversation (preferences, concerns, timeline)' },
       },
       required: ['name', 'phone'],
     },
@@ -112,12 +154,36 @@ async function executeTool(name, input) {
   }
 }
 
+// Common city name aliases → DB names
+const CITY_ALIASES = {
+  'bangalore': 'bengaluru', 'banglore': 'bengaluru', 'blr': 'bengaluru',
+  'mangalore': 'mangaluru', 'mangalor': 'mangaluru',
+  'mysore': 'mysuru', 'mysor': 'mysuru',
+  'trivandrum': 'thiruvananthapuram', 'tvm': 'thiruvananthapuram',
+  'calicut': 'kozhikode', 'kozikode': 'kozhikode',
+  'cochin': 'kochi', 'ernakulam': 'kochi',
+  'trichur': 'thrissur', 'trichure': 'thrissur',
+  'pondicherry': 'puducherry',
+  'madras': 'chennai',
+  'hubli': 'hubballi', 'dharwad': 'hubballi',
+  'shimoga': 'shivamogga',
+  'bellary': 'ballari',
+  'tumkur': 'tumakuru',
+};
+
+function resolveCity(input) {
+  if (!input) return null;
+  const lower = input.toLowerCase().trim();
+  return CITY_ALIASES[lower] || lower;
+}
+
 async function toolSearchColleges({ city, course, max_fee, college_name, type }) {
   const where = { isActive: true };
   const courseWhere = { isActive: true };
 
   if (city) {
-    where.city = { contains: city, mode: 'insensitive' };
+    const resolved = resolveCity(city);
+    where.city = { contains: resolved, mode: 'insensitive' };
   }
   if (type) {
     where.type = { contains: type, mode: 'insensitive' };
@@ -231,16 +297,51 @@ async function toolGetCollegeDetails({ college_id }) {
   };
 }
 
-async function toolCaptureLead({ name, phone, course_interest, city, college_id }) {
+async function toolCaptureLead({ name, phone, email, course_interest, city, college_id, education, budget, notes }) {
   try {
     let cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.length === 12 && cleanPhone.startsWith('91')) cleanPhone = cleanPhone.slice(2);
     if (cleanPhone.length !== 10) return { error: 'Invalid phone number' };
 
+    // Build notes from all collected context
+    const allNotes = [
+      education ? `Education: ${education}` : null,
+      budget ? `Budget: ${budget}` : null,
+      notes || null,
+    ].filter(Boolean).join(' | ');
+
+    const studentData = {
+      name,
+      preferredCat: course_interest || null,
+      preferredCity: city || null,
+      source: 'WhatsApp',
+    };
+    if (email) studentData.email = email;
+    if (allNotes) studentData.notes = allNotes;
+
+    // Parse education for structured fields if available
+    if (education) {
+      const pctMatch = education.match(/(\d{1,3})[\s]*%/);
+      if (pctMatch) studentData.percentage = parseFloat(pctMatch[1]);
+      const streamMatch = education.toLowerCase();
+      if (streamMatch.includes('science') || streamMatch.includes('pcm') || streamMatch.includes('pcb')) studentData.stream = 'Science';
+      else if (streamMatch.includes('commerce')) studentData.stream = 'Commerce';
+      else if (streamMatch.includes('arts') || streamMatch.includes('humanities')) studentData.stream = 'Arts';
+    }
+    if (budget) {
+      const budgetMatch = budget.match(/(\d+)/);
+      if (budgetMatch) {
+        let amt = parseInt(budgetMatch[1]);
+        if (budget.toLowerCase().includes('l') || budget.toLowerCase().includes('lakh')) amt *= 100000;
+        else if (budget.toLowerCase().includes('k')) amt *= 1000;
+        if (amt > 1000) studentData.budgetMax = amt;
+      }
+    }
+
     const student = await prisma.student.upsert({
       where: { phone: cleanPhone },
-      update: { name, preferredCat: course_interest || null, preferredCity: city || null, source: 'WhatsApp' },
-      create: { name, phone: cleanPhone, preferredCat: course_interest || null, preferredCity: city || null, source: 'WhatsApp' },
+      update: studentData,
+      create: { phone: cleanPhone, ...studentData },
     });
 
     if (college_id) {
@@ -257,7 +358,7 @@ async function toolCaptureLead({ name, phone, course_interest, city, college_id 
       }
     }
 
-    return { success: true, message: `Saved ${name} (${cleanPhone}). A counselor will call soon.` };
+    return { success: true, message: `Saved ${name} (${cleanPhone}${email ? ', ' + email : ''}). Education: ${education || '—'}. A counselor will call soon.` };
   } catch (err) {
     console.error('[bot/ai] Lead capture error:', err.message);
     return { error: 'Could not save details. Please try again.' };
@@ -278,9 +379,9 @@ async function aiReply(userMessage, history = []) {
   }
 
   try {
-    // Build message history (last 6 exchanges max to save tokens)
+    // Build message history (last 8 exchanges for counselor context)
     const messages = [];
-    const recentHistory = history.slice(-12); // 6 exchanges = 12 messages
+    const recentHistory = history.slice(-16); // 8 exchanges = 16 messages
 
     for (const h of recentHistory) {
       messages.push({
@@ -295,7 +396,7 @@ async function aiReply(userMessage, history = []) {
     // Call Claude with tools
     let response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 600,
+      max_tokens: 800,
       system: SYSTEM_PROMPT,
       tools: TOOLS,
       messages,
@@ -324,7 +425,7 @@ async function aiReply(userMessage, history = []) {
 
       response = await client.messages.create({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 600,
+        max_tokens: 800,
         system: SYSTEM_PROMPT,
         tools: TOOLS,
         messages,
