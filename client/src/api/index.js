@@ -64,3 +64,4 @@ export const getCollegeEnquiry    = (id)     => api.get(`/college/enquiries/${id
 export const updateCollegeEnquiry = (id, d)  => api.put(`/college/enquiries/${id}`, d).then(r => r.data);
 export const getCollegeProfile    = ()       => api.get('/college/profile').then(r => r.data);
 export const getCollegeCourses    = ()       => api.get('/college/courses').then(r => r.data);
+export const updateCollegeCourse  = (id, d)  => api.put(`/college/courses/${id}`, d).then(r => r.data);
