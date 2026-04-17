@@ -130,7 +130,10 @@ export default function AgentRefer() {
                     ))}
                   </div>
                 )}
-                {collegeSearch && filteredColleges.length === 0 && (
+                {collegeSearch.length === 1 && (
+                  <p className="text-xs text-gray-400 mt-2">Type at least 2 characters to search…</p>
+                )}
+                {collegeSearch.length >= 2 && filteredColleges.length === 0 && (
                   <p className="text-xs text-gray-400 mt-2">No colleges found for "{collegeSearch}"</p>
                 )}
               </div>
@@ -155,6 +158,11 @@ export default function AgentRefer() {
             className="w-full bg-orange-600 text-white font-semibold py-3 rounded-xl hover:bg-orange-700 disabled:opacity-50 transition-colors">
             {mutation.isPending ? 'Submitting…' : 'Submit Referral'}
           </button>
+          {(!form.studentName || !form.studentPhone || !form.collegeId) && (
+            <p className="text-xs text-center text-gray-400 mt-1">
+              {!form.collegeId ? 'Please search and select a college above' : 'Fill in all required fields'}
+            </p>
+          )}
         </form>
       )}
     </div>
