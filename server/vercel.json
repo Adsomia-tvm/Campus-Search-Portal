@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "crons": [
+    { "path": "/api/cron/follow-ups", "schedule": "0 9,14 * * *" }
+  ],
   "builds": [
     {
       "src": "public/**",
