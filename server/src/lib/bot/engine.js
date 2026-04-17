@@ -10,6 +10,7 @@
 const prisma = require('../prisma');
 const { getSession, updateSession, resetSession, addToHistory } = require('./sessions');
 const { notifyNewEnquiry } = require('../notify');
+const { aiReply } = require('./ai');
 
 // ── City list (top cities from DB, can be extended) ─────────────────────────
 const TOP_CITIES = ['Bangalore', 'Mangalore', 'Mysore', 'Kochi', 'Chennai', 'Coimbatore', 'Trivandrum', 'Calicut', 'Hubli', 'Manipal'];
@@ -49,6 +50,16 @@ async function processMessage(phone, message) {
   }
 
   const session = getSession(phone);
+
+  // ── AI shortcut: if text looks like a natural question (>4 words), try AI first from any state
+  const wordCount = text.split(/\s+/).length;
+  if (wordCount >= 4 && session.state === 'MAIN_MENU') {
+    const aiResponse = await aiReply(text, session.history || []);
+    if (aiResponse) {
+      addToHistory(phone, 'bot', aiResponse);
+      return aiResponse;
+    }
+  }
 
   // Route based on current state
   let reply;
@@ -602,17 +613,16 @@ async function agentCommissionSummary(agentId, agentName) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// FREE TEXT HANDLER (keyword matching + AI fallback later)
+// FREE TEXT HANDLER — AI-powered (falls back to keyword search if no API key)
 // ══════════════════════════════════════════════════════════════════════════════
 async function handleFreeText(phone, text, lower, session) {
-  // Try to detect intent from keywords
-  if (lower.match(/fee|cost|price|how much/)) {
-    // Search for college/course mentioned
-    const result = await searchFromText(text);
-    if (result) return result;
-  }
+  // Try AI first (if ANTHROPIC_API_KEY is set)
+  const history = session.history || [];
+  const aiResponse = await aiReply(text, history);
+  if (aiResponse) return aiResponse;
 
-  if (lower.match(/best|top|ranking|placement/)) {
+  // ── Fallback: basic keyword matching (no AI key configured) ──────────
+  if (lower.match(/fee|cost|price|how much|best|top|ranking|placement/)) {
     const result = await searchFromText(text);
     if (result) return result;
   }
@@ -621,11 +631,9 @@ async function handleFreeText(phone, text, lower, session) {
     return '📊 Eligibility varies by college and course. To check eligibility for a specific college:\n\n*1.* Search Colleges (I\'ll show you details)\n*3.* Talk to a Counselor\n\nOr tell me the college name and course you\'re interested in.';
   }
 
-  // Default: try a general search
   const result = await searchFromText(text);
   if (result) return result;
 
-  // Fallback
   return `I'm not sure I understood that. Here's what I can help with:\n\n*1.* 🔍 Search Colleges\n*2.* 📋 Check Application Status\n*3.* 📞 Talk to a Counselor\n*4.* 🤝 Agent Portal\n\nOr ask about a specific college or course!`;
 }
 
