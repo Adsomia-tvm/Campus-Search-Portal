@@ -7,10 +7,11 @@ const ROLE_COLORS = {
   admin:      'bg-red-100 text-red-700 border-red-200',
   staff:      'bg-blue-100 text-blue-700 border-blue-200',
   consultant: 'bg-purple-100 text-purple-700 border-purple-200',
+  college:    'bg-emerald-100 text-emerald-700 border-emerald-200',
 };
-const ROLE_LABELS = { admin: '🔑 Admin', staff: '🧑‍💼 Staff', consultant: '🎓 Consultant' };
+const ROLE_LABELS = { admin: '🔑 Admin', staff: '🧑‍💼 Staff', consultant: '🎓 Consultant', college: '🏫 College' };
 
-const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', phone: '', collegeIds: [] };
+const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', phone: '', collegeIds: [], collegeId: '' };
 
 export default function Team() {
   usePageTitle('Team Management');
@@ -26,7 +27,7 @@ export default function Team() {
   const { data: collegesData } = useQuery({
     queryKey: ['all-colleges-team'],
     queryFn: () => getAdminColleges({ limit: 300 }),
-    enabled: !!assigningUser,
+    enabled: !!assigningUser || (showForm && form.role === 'college'),
   });
 
   const createMutation = useMutation({
@@ -66,6 +67,7 @@ export default function Team() {
   const adminCount = team.filter(u => u.role === 'admin').length;
   const staffCount = team.filter(u => u.role === 'staff').length;
   const consultantCount = team.filter(u => u.role === 'consultant').length;
+  const collegeCount = team.filter(u => u.role === 'college').length;
 
   return (
     <div className="p-6 space-y-5">
@@ -73,7 +75,7 @@ export default function Team() {
         <div>
           <h1 className="text-2xl font-extrabold text-brand">Team Management</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {adminCount} admin · {staffCount} staff · {consultantCount} consultants
+            {adminCount} admin · {staffCount} staff · {consultantCount} consultants · {collegeCount} college accounts
           </p>
         </div>
         <button onClick={() => { setShowForm(true); setEditingId(null); setForm(EMPTY_FORM); }}
@@ -83,11 +85,12 @@ export default function Team() {
       </div>
 
       {/* Role explanation */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { role: 'admin', icon: '🔑', desc: 'Full access — all leads, colleges, settings & team management' },
           { role: 'staff', icon: '🧑‍💼', desc: 'All leads across all colleges — can update status & notes' },
           { role: 'consultant', icon: '🎓', desc: 'Only leads for their assigned colleges — focused view' },
+          { role: 'college', icon: '🏫', desc: 'College self-service — sees own leads, courses & profile only' },
         ].map(r => (
           <div key={r.role} className={`rounded-xl p-4 border ${ROLE_COLORS[r.role]}`}>
             <p className="font-bold text-sm">{r.icon} {r.role.charAt(0).toUpperCase() + r.role.slice(1)}</p>
@@ -201,9 +204,25 @@ export default function Team() {
                   onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
                   <option value="staff">🧑‍💼 Staff — sees all leads</option>
                   <option value="consultant">🎓 Consultant — assigned colleges only</option>
+                  <option value="college">🏫 College — self-service portal</option>
                   <option value="admin">🔑 Admin — full access</option>
                 </select>
               </div>
+              {form.role === 'college' && (
+                <div>
+                  <label className="label">Link to College *</label>
+                  <select className="input" value={form.collegeId}
+                    onChange={e => setForm(f => ({ ...f, collegeId: e.target.value }))}>
+                    <option value="">Select a college...</option>
+                    {allColleges.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} — {c.city}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-emerald-600 bg-emerald-50 p-2 rounded-lg mt-2">
+                    🏫 This user will only see leads, courses, and profile for the selected college. They log in at the same login page and get redirected to the College Portal.
+                  </p>
+                </div>
+              )}
               {form.role === 'consultant' && !editingId && (
                 <p className="text-xs text-purple-600 bg-purple-50 p-2 rounded-lg">
                   💡 After creating, use "Assign Colleges" to set which colleges this consultant manages.
@@ -219,7 +238,11 @@ export default function Team() {
                     if (form.password) d.password = form.password;
                     updateMutation.mutate({ id: editingId, ...d });
                   } else {
-                    createMutation.mutate(form);
+                    const payload = { ...form };
+                    if (payload.role === 'college' && payload.collegeId) {
+                      payload.collegeId = Number(payload.collegeId);
+                    }
+                    createMutation.mutate(payload);
                   }
                 }}
                 disabled={createMutation.isPending || updateMutation.isPending}
