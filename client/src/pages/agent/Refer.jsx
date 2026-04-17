@@ -34,10 +34,10 @@ export default function AgentRefer() {
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (!form.studentName.trim() || !form.studentPhone.trim() || !form.collegeId) return;
+    if (!form.studentName.trim() || !form.studentPhone.trim()) return;
     mutation.mutate({
       ...form,
-      collegeId: Number(form.collegeId),
+      collegeId: form.collegeId ? Number(form.collegeId) : undefined,
       courseId: form.courseId ? Number(form.courseId) : undefined,
     });
   }
@@ -51,7 +51,7 @@ export default function AgentRefer() {
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
           <p className="text-green-700 font-medium text-sm">Referral submitted successfully!</p>
           <p className="text-green-600 text-xs mt-1">
-            {success.student?.name} → {success.college?.name}
+            {success.student?.name} {success.college?.name ? `→ ${success.college.name}` : '— pending college assignment'}
           </p>
           <div className="flex gap-3 mt-3">
             <button onClick={() => setSuccess(null)}
@@ -103,7 +103,7 @@ export default function AgentRefer() {
 
           {/* College Selection */}
           <div className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
-            <h3 className="text-sm font-bold text-gray-900">College *</h3>
+            <h3 className="text-sm font-bold text-gray-900">College <span className="text-gray-400 font-normal">(optional)</span></h3>
             {selectedCollege ? (
               <div className="flex items-center justify-between bg-orange-50 rounded-lg p-3">
                 <div>
@@ -154,14 +154,15 @@ export default function AgentRefer() {
             </div>
           )}
 
-          <button type="submit" disabled={mutation.isPending || !form.studentName || !form.studentPhone || !form.collegeId}
+          <button type="submit" disabled={mutation.isPending || !form.studentName || !form.studentPhone}
             className="w-full bg-orange-600 text-white font-semibold py-3 rounded-xl hover:bg-orange-700 disabled:opacity-50 transition-colors">
             {mutation.isPending ? 'Submitting…' : 'Submit Referral'}
           </button>
-          {(!form.studentName || !form.studentPhone || !form.collegeId) && (
-            <p className="text-xs text-center text-gray-400 mt-1">
-              {!form.collegeId ? 'Please search and select a college above' : 'Fill in all required fields'}
-            </p>
+          {(!form.studentName || !form.studentPhone) && (
+            <p className="text-xs text-center text-gray-400 mt-1">Fill in student name and phone to submit</p>
+          )}
+          {form.studentName && form.studentPhone && !form.collegeId && (
+            <p className="text-xs text-center text-orange-500 mt-1">No college selected — your team will assign one later</p>
           )}
         </form>
       )}
