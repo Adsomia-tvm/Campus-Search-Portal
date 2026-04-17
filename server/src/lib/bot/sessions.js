@@ -40,8 +40,13 @@ function updateSession(phone, updates) {
 }
 
 function resetSession(phone) {
+  // Preserve conversation history across resets so AI has full context
+  const old = sessions.get(phone);
+  const history = old?.history || [];
   sessions.delete(phone);
-  return createSession(phone);
+  const s = createSession(phone);
+  s.history = history;
+  return s;
 }
 
 function addToHistory(phone, role, text) {
