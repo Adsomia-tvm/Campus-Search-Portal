@@ -22,6 +22,13 @@ const Reports       = lazy(() => import('./pages/admin/Reports'));
 const Team          = lazy(() => import('./pages/admin/Team'));
 const AdminLayout   = lazy(() => import('./components/AdminLayout'));
 
+// College portal pages — lazy loaded
+const CollegeLayout     = lazy(() => import('./components/CollegeLayout'));
+const CollegeDashboard  = lazy(() => import('./pages/college/Dashboard'));
+const CollegeEnquiries  = lazy(() => import('./pages/college/Enquiries'));
+const CollegeCourses    = lazy(() => import('./pages/college/Courses'));
+const CollegeProfile    = lazy(() => import('./pages/college/Profile'));
+
 function LoadingFallback() {
   return (
     <div className="flex items-center justify-center h-screen">
@@ -34,6 +41,13 @@ function PrivateRoute({ children, roles }) {
   const { token, user } = useAuthStore();
   if (!token) return <Navigate to="/admin/login" replace />;
   if (roles && user && !roles.includes(user.role)) return <Navigate to="/admin" replace />;
+  return children;
+}
+
+function CollegeRoute({ children }) {
+  const { token, user } = useAuthStore();
+  if (!token) return <Navigate to="/admin/login" replace />;
+  if (user?.role !== 'college') return <Navigate to="/admin" replace />;
   return children;
 }
 
@@ -61,6 +75,14 @@ export default function App() {
         <Route path="commissions" element={<PrivateRoute roles={['admin','staff']}><Commissions /></PrivateRoute>} />
         <Route path="reports"     element={<PrivateRoute roles={['admin','staff']}><Reports /></PrivateRoute>} />
         <Route path="team"        element={<PrivateRoute roles={['admin']}><Team /></PrivateRoute>} />
+      </Route>
+
+      {/* College Portal */}
+      <Route path="/college-portal" element={<CollegeRoute><CollegeLayout /></CollegeRoute>}>
+        <Route index              element={<CollegeDashboard />} />
+        <Route path="enquiries"   element={<CollegeEnquiries />} />
+        <Route path="courses"     element={<CollegeCourses />} />
+        <Route path="profile"     element={<CollegeProfile />} />
       </Route>
     </Routes>
     </Suspense>
