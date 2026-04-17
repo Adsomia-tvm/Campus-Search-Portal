@@ -22,7 +22,7 @@ app.use((req, res, next) => {
     "font-src 'self' https://fonts.gstatic.com; " +
     "img-src 'self' data: https:; " +
     "connect-src 'self' https://campussearch.in https://www.campussearch.in; " +
-    "frame-ancestors 'none';"
+    "frame-ancestors 'none';",
   );
   next();
 });
@@ -276,7 +276,7 @@ app.get('/college/:id', async (req, res) => {
         return res.redirect(301, `/colleges/${college.citySlug}/${college.slug}`);
       }
     }
-  } catch {}
+  } catch { /* slug lookup failed — fall through to SPA */ }
   // Fallback — serve SPA for colleges without slugs yet
   res.sendFile(_path.join(_distPath, 'index.html'));
 });
