@@ -243,8 +243,15 @@ export default function Team() {
                     updateMutation.mutate({ id: editingId, ...d });
                   } else {
                     const payload = { ...form };
+                    // Only send collegeId for college role
                     if (payload.role === 'college' && payload.collegeId) {
                       payload.collegeId = Number(payload.collegeId);
+                    } else {
+                      delete payload.collegeId;
+                    }
+                    // Only send collegeIds for consultant role
+                    if (payload.role !== 'consultant' || !payload.collegeIds?.length) {
+                      delete payload.collegeIds;
                     }
                     createMutation.mutate(payload);
                   }
