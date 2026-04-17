@@ -206,7 +206,7 @@ const createUser = z.object({
     role: z.enum(['staff', 'consultant', 'college', 'agent']),
     phone: z.string().max(20).optional().nullable(),
     collegeIds: z.array(positiveInt).optional(),   // for consultant role
-    collegeId: positiveInt.optional(),              // for college role
+    collegeId: z.preprocess(v => (v === '' || v === null || v === undefined || v === 0) ? undefined : v, positiveInt.optional()),
   }),
 });
 
