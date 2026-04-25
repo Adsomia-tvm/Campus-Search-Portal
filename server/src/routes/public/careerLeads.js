@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const prisma = require('../../lib/prisma');
 const nodemailer = require('nodemailer');
+const zoho = require('../../lib/zohoCrm');
 const validate = require('../../middleware/validate');
 const { careerLead } = require('../../middleware/schemas');
 
@@ -40,6 +41,18 @@ router.post('/', validate(careerLead), async (req, res, next) => {
 
     // Fire email notification (non-blocking)
     sendNotification({ student, topCareer, allMatches, stage, stream }).catch(console.error);
+
+    // Push to Zoho CRM (Career Clarity)
+    if (zoho.isConfigured()) {
+      const pseudoEnquiry = {
+        id: `career-${student.id}`,
+        student,
+        source: 'Career Clarity',
+        status: 'New',
+        notes: [topCareer && `Top Career: ${topCareer}`, stage && `Stage: ${stage}`, stream && `Stream: ${stream}`].filter(Boolean).join(' | '),
+      };
+      zoho.syncEnquiry(pseudoEnquiry).catch(err => console.error('[zoho-career]', err.message));
+    }
 
     res.status(201).json({ success: true, studentId: student.id });
   } catch (err) {
