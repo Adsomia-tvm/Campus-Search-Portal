@@ -4,6 +4,7 @@ const validate = require('../../middleware/validate');
 const { publicEnquiry } = require('../../middleware/schemas');
 const { calculateLeadScore, deriveQualification } = require('../../lib/leadScore');
 const { notifyNewEnquiry } = require('../../lib/notify');
+const zoho = require('../../lib/zohoCrm');
 
 // POST /api/enquiries — student submits enquiry from public website
 router.post('/', validate(publicEnquiry), async (req, res, next) => {
@@ -122,6 +123,11 @@ router.post('/', validate(publicEnquiry), async (req, res, next) => {
 
     // Send email notification (non-blocking)
     notifyNewEnquiry(enquiry, { leadScore, qualificationStatus, source: enquiry.source });
+
+    // Push to Zoho CRM (non-blocking)
+    if (zoho.isConfigured()) {
+      zoho.syncEnquiry({ ...enquiry, leadScore, qualificationStatus }).catch(err => console.error('[zoho-sync]', err.message));
+    }
 
     res.status(201).json({ success: true, enquiryId: enquiry.id, leadScore, qualificationStatus });
   } catch (err) {
