@@ -80,29 +80,32 @@ function mapEnquiryToLead(enquiry) {
   const studentName = enquiry.student?.name || 'Unknown';
   const nameParts = studentName.trim().split(/\s+/);
   const firstName = nameParts[0] || '';
-  const lastName = nameParts.slice(1).join(' ') || firstName; // Zoho requires Last_Name
-
+  const lastName = nameParts.slice(1).join(' ') || firstName;
+  const leadSource = deriveLeadSource(enquiry);
   return {
-    First_Name: firstName,
-    Last_Name: lastName,
-    Phone: enquiry.student?.phone || '',
-    Email: enquiry.student?.email || '',
+    First_Name: firstName, Last_Name: lastName,
+    Phone: enquiry.student?.phone || '', Email: enquiry.student?.email || '',
     Company: enquiry.college?.name || 'Direct Enquiry',
-    Lead_Source: mapSource(enquiry.source),
-    Lead_Status: mapStatus(enquiry.status),
-    Description: [
-      `College: ${enquiry.college?.name || 'N/A'}`,
-      `Course: ${enquiry.course?.name || 'N/A'}`,
-      `CS Lead Score: ${enquiry.leadScore || 0}`,
-      `Qualification: ${enquiry.qualificationStatus || 'N/A'}`,
-      enquiry.notes ? `Notes: ${enquiry.notes}` : '',
-    ].filter(Boolean).join('\n'),
-    // Custom fields (create in Zoho first)
-    CS_Enquiry_ID: String(enquiry.id),
-    CS_Lead_Score: enquiry.leadScore || 0,
-    CS_College: enquiry.college?.name || '',
-    CS_Course: enquiry.course?.name || '',
+    Lead_Source: leadSource, Lead_Status: mapStatus(enquiry.status),
+    Description: [`College: ${enquiry.college?.name||'N/A'}`, `Course: ${enquiry.course?.name||'N/A'}`, `CS Lead Score: ${enquiry.leadScore||0}`].join('\n'),
+    CS_Enquiry_ID: String(enquiry.id), CS_Lead_Score: enquiry.leadScore || 0,
+    CS_College: enquiry.college?.name || '', CS_Course: enquiry.course?.name || '',
+    UTM_Source: enquiry.utm_source || '', UTM_Medium: enquiry.utm_medium || '',
+    UTM_Campaign: enquiry.utm_campaign || '', UTM_Term: enquiry.utm_term || '',
+    UTM_Content: enquiry.utm_content || '',
+    Google_Click_ID: enquiry.gclid || '', FBCLID: enquiry.fbclid || '',
+    Landing_Page: enquiry.landing_page || '', Referrer_URL: enquiry.referrer || '',
   };
+}
+
+function deriveLeadSource(e) {
+  if (e.gclid || (e.utm_source||'').toLowerCase()==='google') return 'Google Ads';
+  if (e.fbclid) return 'Facebook Ads';
+  const s=(e.utm_source||'').toLowerCase();
+  if (['facebook','meta','fb','instagram','ig'].includes(s)) return 'Facebook Ads';
+  if (s==='whatsapp') return 'Chat';
+  if (s==='email') return 'Email';
+  return e.source ? mapSource(e.source) : 'Web Form';
 }
 
 function mapSource(source) {

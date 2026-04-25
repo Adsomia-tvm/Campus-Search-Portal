@@ -52,7 +52,13 @@ router.post('/', validate(careerLead), async (req, res, next) => {
         notes: [topCareer && `Top Career: ${topCareer}`, stage && `Stage: ${stage}`, stream && `Stream: ${stream}`].filter(Boolean).join(' | '),
       };
       try {
-        const zr = await zoho.syncEnquiry(pseudoEnquiry);
+        const zr = await zoho.syncEnquiry({
+          ...pseudoEnquiry,
+          utm_source: req.body.utm_source, utm_medium: req.body.utm_medium,
+          utm_campaign: req.body.utm_campaign,
+          gclid: req.body.gclid, fbclid: req.body.fbclid,
+          landing_page: req.body.landing_page, referrer: req.body.referrer,
+        });
         console.log('[zoho-career] ok', JSON.stringify(zr).slice(0,200));
       } catch (err) {
         console.error('[zoho-career] error:', err.message);

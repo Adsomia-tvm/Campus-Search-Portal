@@ -127,7 +127,14 @@ router.post('/', validate(publicEnquiry), async (req, res, next) => {
     // Push to Zoho CRM (await so Vercel serverless doesn't kill it after res.send)
     if (zoho.isConfigured()) {
       try {
-        const zr = await zoho.syncEnquiry({ ...enquiry, leadScore, qualificationStatus });
+        const zr = await zoho.syncEnquiry({
+          ...enquiry, leadScore, qualificationStatus,
+          utm_source: req.body.utm_source, utm_medium: req.body.utm_medium,
+          utm_campaign: req.body.utm_campaign, utm_term: req.body.utm_term,
+          utm_content: req.body.utm_content,
+          gclid: req.body.gclid, fbclid: req.body.fbclid,
+          landing_page: req.body.landing_page, referrer: req.body.referrer,
+        });
         console.log('[zoho-sync] ok', JSON.stringify(zr).slice(0,200));
       } catch (err) {
         console.error('[zoho-sync] error:', err.message);
