@@ -86,7 +86,8 @@ function mapEnquiryToLead(enquiry) {
     First_Name: firstName, Last_Name: lastName,
     Phone: enquiry.student?.phone || '', Email: enquiry.student?.email || '',
     Company: enquiry.college?.name || 'Direct Enquiry',
-    Lead_Source: leadSource, Lead_Status: mapStatus(enquiry.status),
+    Lead_Source: leadSource,
+    Channel_Type: deriveChannelType(leadSource), Lead_Status: mapStatus(enquiry.status),
     Description: [`College: ${enquiry.college?.name||'N/A'}`, `Course: ${enquiry.course?.name||'N/A'}`, `CS Lead Score: ${enquiry.leadScore||0}`].join('\n'),
     CS_Enquiry_ID: String(enquiry.id), CS_Lead_Score: enquiry.leadScore || 0,
     CS_College: enquiry.college?.name || '', CS_Course: enquiry.course?.name || '',
@@ -99,13 +100,65 @@ function mapEnquiryToLead(enquiry) {
 }
 
 function deriveLeadSource(e) {
-  if (e.gclid || (e.utm_source||'').toLowerCase()==='google') return 'Google Ads';
+  const utm = (e.utm_source || '').toLowerCase().trim();
+  const um  = (e.utm_medium || '').toLowerCase().trim();
+  const ref = (e.referrer || '').toLowerCase();
+  const PAID_MEDIUMS = ['cpc','ppc','paid','ads','display','banner','remarketing'];
+  const isPaidMedium = PAID_MEDIUMS.includes(um);
+
+  // 1. PAID ADS — click IDs are definitive, also paid mediums
+  if (e.gclid || (utm === 'google' && isPaidMedium)) return 'Google Ads';
   if (e.fbclid) return 'Facebook Ads';
-  const s=(e.utm_source||'').toLowerCase();
-  if (['facebook','meta','fb','instagram','ig'].includes(s)) return 'Facebook Ads';
-  if (s==='whatsapp') return 'Chat';
-  if (s==='email') return 'Email';
-  return e.source ? mapSource(e.source) : 'Web Form';
+  if (['facebook','meta','fb'].includes(utm) && isPaidMedium) return 'Facebook Ads';
+  if (utm === 'instagram' && isPaidMedium) return 'Instagram Ads';
+  if (utm === 'youtube' && isPaidMedium) return 'YouTube Ads';
+  if (utm === 'linkedin' && isPaidMedium) return 'LinkedIn Ads';
+  if (isPaidMedium) return 'Other Paid Ads';
+
+  // 2. AI / GENERATIVE ENGINES (referrer-based — they don't pass UTM)
+  if (ref.includes('chatgpt.com') || ref.includes('chat.openai.com')) return 'ChatGPT';
+  if (ref.includes('claude.ai')) return 'Claude';
+  if (ref.includes('perplexity.ai')) return 'Perplexity';
+  if (ref.includes('gemini.google.com') || ref.includes('bard.google.com')) return 'Gemini';
+  if (ref.includes('copilot.microsoft.com') || ref.includes('bing.com/chat')) return 'Copilot';
+  if (utm === 'chatgpt') return 'ChatGPT';
+  if (utm === 'claude') return 'Claude';
+  if (utm === 'perplexity') return 'Perplexity';
+  if (utm === 'gemini') return 'Gemini';
+
+  // 3. ORGANIC SEARCH
+  if (ref.includes('google.com/search') || ref.match(/google\.[a-z.]+\//)) return 'Google Organic';
+  if (ref.includes('bing.com')) return 'Bing Organic';
+
+  // 4. ORGANIC SOCIAL
+  if (ref.includes('facebook.com') || ref.includes('m.facebook.com')) return 'Facebook Organic';
+  if (ref.includes('instagram.com')) return 'Instagram Organic';
+  if (ref.includes('linkedin.com')) return 'LinkedIn Organic';
+  if (ref.includes('twitter.com') || ref.includes('x.com')) return 'Twitter Organic';
+  if (ref.includes('youtube.com') || ref.includes('youtu.be')) return 'YouTube Organic';
+  if (ref.includes('reddit.com')) return 'Reddit';
+  if (ref.includes('quora.com')) return 'Quora';
+
+  // 5. EMAIL / DIRECT / OTHER
+  if (utm === 'email' || um === 'email') return 'Email';
+  if (utm === 'whatsapp') return 'WhatsApp';
+  if (e.source === 'Career Clarity') return 'Career Clarity';
+  if (e.source === 'Agent') return 'Agent Referral';
+  if (e.source === 'Walk-in') return 'Walk-in';
+  if (e.source === 'WhatsApp') return 'WhatsApp';
+  if (!ref && !utm) return 'Direct';
+  return 'Web Form';
+}
+
+function deriveChannelType(leadSource) {
+  if (['Google Ads','Facebook Ads','Instagram Ads','YouTube Ads','LinkedIn Ads','Other Paid Ads'].includes(leadSource)) return 'Paid Ads';
+  if (['Google Organic','Bing Organic'].includes(leadSource)) return 'Organic Search';
+  if (['ChatGPT','Claude','Perplexity','Gemini','Copilot'].includes(leadSource)) return 'AI / GEO';
+  if (['Facebook Organic','Instagram Organic','LinkedIn Organic','Twitter Organic','YouTube Organic','Reddit','Quora'].includes(leadSource)) return 'Organic Social';
+  if (leadSource === 'Email') return 'Email';
+  if (leadSource === 'Direct') return 'Direct';
+  if (['Agent Referral','Career Clarity','WhatsApp','Walk-in','Phone Call','External Referral','Employee Referral','Partner'].includes(leadSource)) return 'Referral';
+  return 'Other';
 }
 
 function mapSource(source) {
