@@ -51,7 +51,12 @@ router.post('/', validate(careerLead), async (req, res, next) => {
         status: 'New',
         notes: [topCareer && `Top Career: ${topCareer}`, stage && `Stage: ${stage}`, stream && `Stream: ${stream}`].filter(Boolean).join(' | '),
       };
-      zoho.syncEnquiry(pseudoEnquiry).catch(err => console.error('[zoho-career]', err.message));
+      try {
+        const zr = await zoho.syncEnquiry(pseudoEnquiry);
+        console.log('[zoho-career] ok', JSON.stringify(zr).slice(0,200));
+      } catch (err) {
+        console.error('[zoho-career] error:', err.message);
+      }
     }
 
     res.status(201).json({ success: true, studentId: student.id });

@@ -124,12 +124,14 @@ router.post('/', validate(publicEnquiry), async (req, res, next) => {
     // Send email notification (non-blocking)
     notifyNewEnquiry(enquiry, { leadScore, qualificationStatus, source: enquiry.source });
 
-    // Push to Zoho CRM (non-blocking)
-    console.log('[zoho-debug] configured=', zoho.isConfigured(), 'CLIENT_ID set=', !!process.env.ZOHO_CLIENT_ID, 'REFRESH set=', !!process.env.ZOHO_REFRESH_TOKEN);
+    // Push to Zoho CRM (await so Vercel serverless doesn't kill it after res.send)
     if (zoho.isConfigured()) {
-      zoho.syncEnquiry({ ...enquiry, leadScore, qualificationStatus })
-        .then(r => console.log('[zoho-sync] ok', JSON.stringify(r).slice(0,200)))
-        .catch(err => console.error('[zoho-sync] error:', err.message, err.stack?.slice(0,300)));
+      try {
+        const zr = await zoho.syncEnquiry({ ...enquiry, leadScore, qualificationStatus });
+        console.log('[zoho-sync] ok', JSON.stringify(zr).slice(0,200));
+      } catch (err) {
+        console.error('[zoho-sync] error:', err.message);
+      }
     }
 
     res.status(201).json({ success: true, enquiryId: enquiry.id, leadScore, qualificationStatus });
