@@ -231,6 +231,31 @@ async function bulkSyncLeads(enquiries) {
   return results;
 }
 
+
+// ── Create Zoho Deal when enrollment happens ────────────────────────────
+async function createApplicationDeal(enquiry) {
+  const phone = enquiry.student?.phone;
+  let zohoLeadId = null;
+  if (phone) {
+    const lead = await findLeadByPhone(phone);
+    zohoLeadId = lead?.id || null;
+  }
+  const studentName = enquiry.student?.name || 'Unknown';
+  const collegeName = enquiry.college?.name || 'Unknown College';
+  const courseName  = enquiry.course?.name  || '';
+  const data = {
+    Deal_Name: `${studentName} -> ${collegeName}` + (courseName ? ` (${courseName})` : ''),
+    Stage: 'Qualification',
+    Application_Status: 'Enrolled',
+    Course_Name: courseName || undefined,
+    Application_Date: new Date().toISOString().slice(0,10),
+    Description: `CS Enquiry ID: ${enquiry.id}\nStudent: ${studentName} (${phone || 'no-phone'})\nCollege: ${collegeName}`,
+    ...(zohoLeadId ? { Source_Lead: zohoLeadId } : {}),
+  };
+  Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
+  return zohoRequest('POST', '/Deals', { data: [data] });
+}
+
 // ── Check if configured ────────────────────────────────────────────────────
 
 function isConfigured() {
@@ -239,6 +264,7 @@ function isConfigured() {
 
 module.exports = {
   syncEnquiry,
+  createApplicationDeal,
   pushLead,
   updateLead,
   pushAccount,
