@@ -125,8 +125,11 @@ router.post('/', validate(publicEnquiry), async (req, res, next) => {
     notifyNewEnquiry(enquiry, { leadScore, qualificationStatus, source: enquiry.source });
 
     // Push to Zoho CRM (non-blocking)
+    console.log('[zoho-debug] configured=', zoho.isConfigured(), 'CLIENT_ID set=', !!process.env.ZOHO_CLIENT_ID, 'REFRESH set=', !!process.env.ZOHO_REFRESH_TOKEN);
     if (zoho.isConfigured()) {
-      zoho.syncEnquiry({ ...enquiry, leadScore, qualificationStatus }).catch(err => console.error('[zoho-sync]', err.message));
+      zoho.syncEnquiry({ ...enquiry, leadScore, qualificationStatus })
+        .then(r => console.log('[zoho-sync] ok', JSON.stringify(r).slice(0,200)))
+        .catch(err => console.error('[zoho-sync] error:', err.message, err.stack?.slice(0,300)));
     }
 
     res.status(201).json({ success: true, enquiryId: enquiry.id, leadScore, qualificationStatus });
