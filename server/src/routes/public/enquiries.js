@@ -11,7 +11,13 @@ router.post('/', validate(publicEnquiry), async (req, res, next) => {
   try {
     const { name, phone, email, city, preferredCat, preferredCity, budgetMax,
             percentage, stream, collegeId, courseId, source = 'Website',
-            utmSource, utmMedium, utmCampaign, referralCode } = req.body;
+            referralCode } = req.body;
+
+    // UTM fields — accept both camelCase (legacy callers) and snake_case
+    // (the public website + landing pages send snake_case per Zoho convention).
+    const utmSource   = req.body.utmSource   || req.body.utm_source   || null;
+    const utmMedium   = req.body.utmMedium   || req.body.utm_medium   || null;
+    const utmCampaign = req.body.utmCampaign || req.body.utm_campaign || null;
 
     // Sanitize
     const cleanName = name.replace(/<[^>]*>/g, '').trim().slice(0, 100);
