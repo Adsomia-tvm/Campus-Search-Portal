@@ -6,6 +6,21 @@ const { calculateLeadScore, deriveQualification } = require('../../lib/leadScore
 const { notifyNewEnquiry } = require('../../lib/notify');
 const zoho = require('../../lib/zohoCrm');
 
+// ── Round-robin counselor assignment ────────────────────────────────────────
+// Picks the active 'staff' user with the fewest assigned enquiries so that
+// new leads are distributed evenly across the team. Ties break on lowest
+// user ID for deterministic ordering. Returns null if there are no active
+// staff — the enquiry then stays unassigned for manual triage.
+async function pickNextCounselor() {
+  const staff = await prisma.user.findMany({
+    where: { role: 'staff', isActive: true },
+    select: { id: true, _count: { select: { enquiries: true } } },
+  });
+  if (staff.length === 0) return null;
+  staff.sort((a, b) => a._count.enquiries - b._count.enquiries || a.id - b.id);
+  return staff[0].id;
+}
+
 // POST /api/enquiries — student submits enquiry from public website
 router.post('/', validate(publicEnquiry), async (req, res, next) => {
   try {
@@ -55,6 +70,22 @@ router.post('/', validate(publicEnquiry), async (req, res, next) => {
       },
     });
 
+    // ── Counselor assignment (round-robin) ─────────────────────────────────
+    // Returning students inherit their existing counselor so the same person
+    // owns the relationship. New students get the next-in-rotation least-
+    // loaded active staff member, and we persist it on the Student record
+    // so future enquiries from this phone reuse the same counselor.
+    let counselorId = student.counselorId;
+    if (!counselorId) {
+      counselorId = await pickNextCounselor();
+      if (counselorId) {
+        await prisma.student.update({
+          where: { id: student.id },
+          data: { counselorId },
+        });
+      }
+    }
+
     // Get college city for lead scoring
     const college = await prisma.college.findUnique({
       where: { id: Number(collegeId) },
@@ -85,6 +116,7 @@ router.post('/', validate(publicEnquiry), async (req, res, next) => {
           collegeId: Number(collegeId),
           courseId:  courseId ? Number(courseId) : null,
           agentId,
+          counselorId: counselorId || null,
           status: 'New',
           source: source || 'Website',
           utmSource: utmSource || null,
