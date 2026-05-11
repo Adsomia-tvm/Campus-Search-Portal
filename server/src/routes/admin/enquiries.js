@@ -9,7 +9,7 @@ const { notifyNewEnquiry, notifyStatusChange } = require('../../lib/notify');
 
 router.use(requireTeamMember);
 
-const STATUSES = ['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped'];
+const STATUSES = ['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped', 'Junk'];
 
 // GET /api/admin/enquiries
 // - admin/staff: see all

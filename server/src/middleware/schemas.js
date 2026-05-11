@@ -53,7 +53,7 @@ const createEnquiry = z.object({
     studentId: positiveInt,
     collegeId: positiveInt,
     courseId: positiveInt.optional().nullable(),
-    status: z.enum(['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped']).default('New').optional(),
+    status: z.enum(['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped', 'Junk']).default('New').optional(),
     counselorId: positiveInt.optional().nullable(),
     notes: z.string().max(2000).optional().nullable(),
   }),
@@ -62,7 +62,7 @@ const createEnquiry = z.object({
 const updateEnquiry = z.object({
   params: z.object({ id: positiveInt }),
   body: z.object({
-    status: z.enum(['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped']).optional(),
+    status: z.enum(['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped', 'Junk']).optional(),
     counselorId: positiveInt.optional().nullable(),
     followUpDate: z.string().datetime().optional().nullable(),
     notes: z.string().max(2000).optional().nullable(),
