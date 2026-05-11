@@ -94,6 +94,55 @@ router.put('/:id', requireAdmin, validate(updateUser), async (req, res, next) =>
   }
 });
 
+// DELETE /api/admin/users/:id — admin removes a team member.
+// Safety rails:
+//   - cannot delete your own account
+//   - cannot delete the last active admin
+//   - detaches counselor assignments and student-login links so the
+//     foreign-key constraints don't block the delete
+//   - if the user has an agent profile with commissions/payouts the
+//     delete will surface a P2003 error and we'll suggest deactivation.
+router.delete('/:id', requireAdmin, validate(idParam), async (req, res, next) => {
+  try {
+    const userId = Number(req.params.id);
+    if (userId === req.user.id) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+
+    const target = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { agent: true },
+    });
+    if (!target) return res.status(404).json({ error: 'User not found' });
+
+    if (target.role === 'admin') {
+      const adminCount = await prisma.user.count({ where: { role: 'admin', isActive: true } });
+      if (adminCount <= 1) {
+        return res.status(400).json({ error: 'Cannot delete the last active admin' });
+      }
+    }
+
+    await prisma.$transaction([
+      prisma.enquiry.updateMany({ where: { counselorId: userId }, data: { counselorId: null } }),
+      prisma.student.updateMany({ where: { counselorId: userId }, data: { counselorId: null } }),
+      prisma.student.updateMany({ where: { userId },              data: { userId: null } }),
+      prisma.consultantCollege.deleteMany({ where: { userId } }),
+      prisma.session.deleteMany({ where: { userId } }),
+      ...(target.agent ? [prisma.agent.delete({ where: { id: target.agent.id } })] : []),
+      prisma.user.delete({ where: { id: userId } }),
+    ]);
+
+    res.json({ success: true, deletedId: userId });
+  } catch (err) {
+    if (err?.code === 'P2003') {
+      return res.status(400).json({
+        error: 'User has linked records (e.g. agent commissions, audit history) that block deletion. Deactivate the user instead.',
+      });
+    }
+    next(err);
+  }
+});
+
 // PUT /api/admin/users/:id/colleges — set consultant's assigned colleges
 router.put('/:id/colleges', requireAdmin, async (req, res, next) => {
   try {
