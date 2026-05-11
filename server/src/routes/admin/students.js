@@ -24,7 +24,23 @@ router.get('/', async (req, res, next) => {
     const [students, total] = await Promise.all([
       prisma.student.findMany({
         where, skip, take, orderBy: { createdAt: 'desc' },
-        include: { _count: { select: { enquiries: true } } },
+        include: {
+          _count: { select: { enquiries: true } },
+          // Latest UTM-tagged enquiry per student — used by the admin UI to
+          // surface campaign attribution next to each student row. We only
+          // pull rows where at least one UTM field is set so the listing
+          // doesn't bias toward direct/untagged enquiries.
+          enquiries: {
+            where: { OR: [
+              { utmSource:   { not: null } },
+              { utmMedium:   { not: null } },
+              { utmCampaign: { not: null } },
+            ] },
+            select: { utmSource: true, utmMedium: true, utmCampaign: true, createdAt: true },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
       }),
       prisma.student.count({ where }),
     ]);
