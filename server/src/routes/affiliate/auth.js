@@ -6,7 +6,7 @@ const { requireAffiliate } = require('../../middleware/auth');
 
 const TOKEN_EXPIRY = '30d';
 
-// POST /api/affiliate/auth/login — login with code + password
+// POST /api/affiliate/auth/login — login with code OR email + password
 router.post('/login', async (req, res, next) => {
   try {
     const { code, password } = req.body || {};
@@ -14,15 +14,29 @@ router.post('/login', async (req, res, next) => {
       return res.status(400).json({ error: 'Code and password are required' });
     }
 
-    const affiliate = await prisma.affiliate.findUnique({
-      where: { code: String(code).trim().toLowerCase() },
-    });
+    const id = String(code).trim();
+    const lower = id.toLowerCase();
+
+    // Affiliates can sign in with either their unique code (e.g. rave_works)
+    // or their email — emails are easier to remember and the code field on
+    // the login form accepts both. We try code first, then fall back to email.
+    let affiliate = await prisma.affiliate.findUnique({ where: { code: lower } });
+    if (!affiliate && id.includes('@')) {
+      affiliate = await prisma.affiliate.findFirst({ where: { email: id } });
+    }
 
     // Constant-ish response timing — don't leak whether the affiliate exists.
     if (!affiliate || !affiliate.passwordHash || !affiliate.isActive) {
       // Run a dummy hash so timing is similar to a real check
       await bcrypt.compare(password, '$2a$10$invalidsaltinvalidsaltinvalidsaltinvalidsalu');
-      return res.status(401).json({ error: 'Invalid code or password' });
+      const reason = !affiliate ? 'no_match'
+                   : !affiliate.passwordHash ? 'no_password_set'
+                   : 'inactive';
+      return res.status(401).json({
+        error: reason === 'no_password_set'
+          ? 'Password not set for this affiliate yet. Ask the Campus Search team to set one.'
+          : 'Invalid code or password',
+      });
     }
 
     const ok = await bcrypt.compare(password, affiliate.passwordHash);
