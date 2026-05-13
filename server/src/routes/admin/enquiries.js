@@ -48,7 +48,11 @@ router.get('/', async (req, res, next) => {
       prisma.enquiry.findMany({
         where, skip, take, orderBy: { createdAt: 'desc' },
         include: {
-          student:   { select: { id: true, name: true, phone: true, preferredCat: true } },
+          // notes carries the Career Clarity output (top career match,
+          // all matches, stage, stream) so the listing can surface it
+          // to counsellors without an extra lookup. email + city help
+          // counsellors fill the call quickly.
+          student:   { select: { id: true, name: true, phone: true, email: true, city: true, preferredCat: true, notes: true } },
           college:   { select: { id: true, name: true, city: true } },
           course:    { select: { id: true, name: true } },
           counselor: { select: { id: true, name: true } },
