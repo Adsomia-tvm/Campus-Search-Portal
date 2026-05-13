@@ -4,6 +4,43 @@ const nodemailer = require('nodemailer');
 const zoho = require('../../lib/zohoCrm');
 const validate = require('../../middleware/validate');
 const { careerLead } = require('../../middleware/schemas');
+const { calculateLeadScore, deriveQualification } = require('../../lib/leadScore');
+
+// ── Round-robin counselor assignment (same pool as /api/enquiries) ──────────
+async function pickNextCounselor() {
+  const staff = await prisma.user.findMany({
+    where: { role: 'staff', isActive: true },
+    select: { id: true, _count: { select: { enquiries: true } } },
+  });
+  if (staff.length === 0) return null;
+  staff.sort((a, b) => a._count.enquiries - b._count.enquiries || a.id - b.id);
+  return staff[0].id;
+}
+
+// ── Placeholder "Career Clarity" college ────────────────────────────────────
+// Career Clarity submissions don't have a target college — but Enquiry.collegeId
+// is required. We use a hidden placeholder college so career leads can flow
+// through the same Enquiry pipeline (admin listing, UTM badges, round-robin
+// counselor, status workflow) without changing the schema.
+let cachedCareerCollegeId = null;
+async function getCareerClarityCollegeId() {
+  if (cachedCareerCollegeId) return cachedCareerCollegeId;
+  const existing = await prisma.college.findFirst({
+    where: { slug: '_career_clarity' },
+    select: { id: true },
+  });
+  if (existing) { cachedCareerCollegeId = existing.id; return existing.id; }
+  const created = await prisma.college.create({
+    data: {
+      name: 'Career Clarity (no college selected)',
+      slug: '_career_clarity',
+      isActive: false, // never surfaces in public listings
+    },
+    select: { id: true },
+  });
+  cachedCareerCollegeId = created.id;
+  return created.id;
+}
 
 // POST /api/career-leads — Career Clarity form submission from campussearch.in
 router.post('/', validate(careerLead), async (req, res, next) => {
@@ -13,13 +50,19 @@ router.post('/', validate(careerLead), async (req, res, next) => {
     // Sanitize user input before storing
     const name = rawName.replace(/<[^>]*>/g, '').trim().slice(0, 100);
 
+    // UTM tracking — accept both camelCase and snake_case to match the
+    // website's snake_case convention used in /api/enquiries.
+    const utmSource   = req.body.utmSource   || req.body.utm_source   || null;
+    const utmMedium   = req.body.utmMedium   || req.body.utm_medium   || null;
+    const utmCampaign = req.body.utmCampaign || req.body.utm_campaign || null;
+
     const notes = [
       topCareer ? `Top Career Match: ${topCareer}` : null,
       allMatches?.length > 1 ? `All Matches: ${allMatches.join(', ')}` : null,
       stage ? `Stage: ${stage}` : null,
     ].filter(Boolean).join(' | ');
 
-    // Upsert student — phone is unique key
+    // Upsert student — phone is unique key. Inherit existing counselor if set.
     const student = await prisma.student.upsert({
       where: { phone },
       update: {
@@ -38,6 +81,52 @@ router.post('/', validate(careerLead), async (req, res, next) => {
         notes,
       },
     });
+
+    // Counselor assignment — returning students keep their existing counselor,
+    // new students get the next-in-rotation least-loaded staff. Persisted on
+    // Student so future enquiries from the same phone reuse the same person.
+    let counselorId = student.counselorId;
+    if (!counselorId) {
+      counselorId = await pickNextCounselor();
+      if (counselorId) {
+        await prisma.student.update({
+          where: { id: student.id },
+          data: { counselorId },
+        });
+      }
+    }
+
+    // ── Create Enquiry record so this lead shows up in /admin/enquiries ─────
+    // We tie it to a hidden placeholder college so the Enquiry.collegeId
+    // requirement is satisfied without polluting the public college list.
+    const careerCollegeId = await getCareerClarityCollegeId();
+    const enquiryCount = await prisma.enquiry.count({ where: { studentId: student.id } });
+    const leadScore = calculateLeadScore(
+      student,
+      { source: 'Career Clarity', collegeId: careerCollegeId, courseId: null, _collegeCity: null },
+      enquiryCount + 1,
+    );
+    const qualificationStatus = deriveQualification(leadScore, 'New');
+
+    try {
+      await prisma.enquiry.create({
+        data: {
+          studentId:   student.id,
+          collegeId:   careerCollegeId,
+          counselorId: counselorId || null,
+          status:      'New',
+          source:      'Career Clarity',
+          utmSource, utmMedium, utmCampaign,
+          leadScore,
+          qualificationStatus,
+        },
+      });
+    } catch (createErr) {
+      // P2002 = unique (studentId, collegeId) — student already submitted
+      // Career Clarity once. That's fine; we keep the original enquiry and
+      // just refresh the Student row + push to Zoho below.
+      if (createErr.code !== 'P2002') throw createErr;
+    }
 
     // Fire email notification (non-blocking)
     sendNotification({ student, topCareer, allMatches, stage, stream }).catch(console.error);
