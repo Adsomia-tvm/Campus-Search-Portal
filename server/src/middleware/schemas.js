@@ -235,6 +235,37 @@ const careerLead = z.object({
   }),
 });
 
+// ── Affiliate ────────────────────────────────────────────────────────────────
+
+const AFFILIATE_TYPES = ['influencer', 'blogger', 'counsellor', 'agency', 'other'];
+const AFFILIATE_CADENCE = ['monthly', 'per_enrollment'];
+
+const createAffiliate = z.object({
+  body: z.object({
+    name:                  z.string().trim().min(2).max(100),
+    email:                 optionalEmail.nullable(),
+    phone:                 z.string().max(20).optional().nullable(),
+    // UTM-friendly code: lowercase letters, digits, underscores, hyphens.
+    code:                  z.string().trim().toLowerCase().min(2).max(50).regex(/^[a-z0-9_-]+$/, 'lowercase letters, digits, _ or - only'),
+    type:                  z.enum(AFFILIATE_TYPES).default('influencer').optional(),
+    commissionPerLead:     z.coerce.number().int().min(0).optional().nullable(),
+    commissionPerEnrolled: z.coerce.number().int().min(0).optional().nullable(),
+    paymentCadence:        z.enum(AFFILIATE_CADENCE).default('monthly').optional(),
+    upiId:                 z.string().max(100).optional().nullable(),
+    bankAccount:           z.string().max(50).optional().nullable(),
+    ifsc:                  z.string().max(20).optional().nullable(),
+    panNumber:             z.string().max(20).optional().nullable(),
+    gstNumber:             z.string().max(20).optional().nullable(),
+    notes:                 z.string().max(2000).optional().nullable(),
+    isActive:              z.boolean().optional(),
+  }),
+});
+
+const updateAffiliate = z.object({
+  params: z.object({ id: positiveInt }),
+  body: createAffiliate.shape.body.partial(),
+});
+
 // ── ID param (reusable) ─────────────────────────────────────────────────────
 
 const idParam = z.object({
@@ -259,5 +290,7 @@ module.exports = {
   createUser,
   updateUser,
   careerLead,
+  createAffiliate,
+  updateAffiliate,
   idParam,
 };

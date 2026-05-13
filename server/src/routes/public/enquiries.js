@@ -6,6 +6,21 @@ const { calculateLeadScore, deriveQualification } = require('../../lib/leadScore
 const { notifyNewEnquiry } = require('../../lib/notify');
 const zoho = require('../../lib/zohoCrm');
 
+// ── Affiliate auto-attribution ──────────────────────────────────────────────
+// When the lead arrives with a utm_campaign value that matches an active
+// Affiliate.code, we link the enquiry to that affiliate so commission
+// reporting picks it up automatically.
+async function resolveAffiliateId(utmCampaign) {
+  if (!utmCampaign) return null;
+  const code = String(utmCampaign).trim().toLowerCase();
+  if (!code) return null;
+  const affiliate = await prisma.affiliate.findUnique({
+    where: { code },
+    select: { id: true, isActive: true },
+  });
+  return (affiliate && affiliate.isActive) ? affiliate.id : null;
+}
+
 // ── Round-robin counselor assignment ────────────────────────────────────────
 // Picks the active 'staff' user with the fewest assigned enquiries so that
 // new leads are distributed evenly across the team. Ties break on lowest
@@ -105,6 +120,9 @@ router.post('/', validate(publicEnquiry), async (req, res, next) => {
     const leadScore = calculateLeadScore(student, enquiryData, enquiryCount + 1);
     const qualificationStatus = deriveQualification(leadScore, 'New');
 
+    // Resolve affiliate (if utm_campaign matches an active Affiliate.code).
+    const affiliateId = await resolveAffiliateId(utmCampaign);
+
     // ── LEAD-03: Dedup — upsert enquiry ──────────────────────────────────────
     // If student already enquired about this college, update with better data
     let enquiry;
@@ -116,6 +134,7 @@ router.post('/', validate(publicEnquiry), async (req, res, next) => {
           collegeId: Number(collegeId),
           courseId:  courseId ? Number(courseId) : null,
           agentId,
+          affiliateId,
           counselorId: counselorId || null,
           status: 'New',
           source: source || 'Website',

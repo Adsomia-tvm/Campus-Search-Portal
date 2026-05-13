@@ -127,7 +127,8 @@ model Enquiry {
   collegeId      Int
   courseId       Int?
   agentId        Int?     // Referring agent (if lead came through an agent)
-  status         String   @default("New") // New / Contacted / Visited / Applied / Enrolled / Dropped
+  affiliateId    Int?     // Affiliate marketer (matched via utm_campaign on create)
+  status         String   @default("New") // New / Contacted / Visited / Applied / Enrolled / Dropped / Junk
   counselorId    Int?
   followUpDate   DateTime?
   notes          String?
@@ -149,6 +150,7 @@ model Enquiry {
   course     Course?     @relation(fields: [courseId], references: [id])
   counselor  User?       @relation(fields: [counselorId], references: [id])
   agent      Agent?      @relation(fields: [agentId], references: [id])
+  affiliate  Affiliate?  @relation(fields: [affiliateId], references: [id])
   commission Commission?
 
   @@unique([studentId, collegeId]) // Prevent duplicate enquiries per student-college pair
@@ -157,6 +159,7 @@ model Enquiry {
   @@index([status])
   @@index([counselorId])
   @@index([agentId])
+  @@index([affiliateId])
   @@index([createdAt])
   @@index([collegeId, status])      // dashboard: status counts scoped to colleges
   @@index([collegeId, createdAt])   // dashboard: recent enquiries per college
@@ -341,6 +344,40 @@ model Agent {
 
   @@index([referralCode])
   @@map("agents")
+}
+
+// ── Affiliate marketer ──────────────────────────────────────────────────────
+// Distinct from Agent: agents are internal partners who actively refer
+// individual students (own logins, dashboards). Affiliates are external
+// marketers (influencers, bloggers, content creators) who drive traffic via
+// UTM-tagged links. Enquiries are linked automatically when their
+// utm_campaign matches an Affiliate.code.
+model Affiliate {
+  id                   Int      @id @default(autoincrement())
+  name                 String
+  email                String?
+  phone                String?
+  code                 String   @unique  // matches utm_campaign (lowercase, no spaces)
+  type                 String   @default("influencer") // influencer / blogger / counsellor / agency / other
+  commissionPerLead    Int?     // INR — paid per qualified lead (Contacted or beyond)
+  commissionPerEnrolled Int?    // INR — paid per Enrolled status
+  paymentCadence       String   @default("monthly")   // monthly / per_enrollment
+  upiId                String?
+  bankAccount          String?
+  ifsc                 String?
+  panNumber            String?
+  gstNumber            String?
+  notes                String?
+  isActive             Boolean  @default(true)
+  joinedAt             DateTime @default(now())
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  enquiries Enquiry[]
+
+  @@index([code])
+  @@index([isActive])
+  @@map("affiliates")
 }
 
 // Links a consultant to the specific colleges they manage

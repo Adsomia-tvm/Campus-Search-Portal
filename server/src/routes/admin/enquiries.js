@@ -52,6 +52,7 @@ router.get('/', async (req, res, next) => {
           college:   { select: { id: true, name: true, city: true } },
           course:    { select: { id: true, name: true } },
           counselor: { select: { id: true, name: true } },
+          affiliate: { select: { id: true, name: true, code: true } },
         },
       }),
       prisma.enquiry.count({ where }),

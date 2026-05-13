@@ -6,6 +6,18 @@ const validate = require('../../middleware/validate');
 const { careerLead } = require('../../middleware/schemas');
 const { calculateLeadScore, deriveQualification } = require('../../lib/leadScore');
 
+// ── Affiliate auto-attribution (utm_campaign → Affiliate.code) ──────────────
+async function resolveAffiliateId(utmCampaign) {
+  if (!utmCampaign) return null;
+  const code = String(utmCampaign).trim().toLowerCase();
+  if (!code) return null;
+  const affiliate = await prisma.affiliate.findUnique({
+    where: { code },
+    select: { id: true, isActive: true },
+  });
+  return (affiliate && affiliate.isActive) ? affiliate.id : null;
+}
+
 // ── Round-robin counselor assignment (same pool as /api/enquiries) ──────────
 async function pickNextCounselor() {
   const staff = await prisma.user.findMany({
@@ -108,12 +120,15 @@ router.post('/', validate(careerLead), async (req, res, next) => {
     );
     const qualificationStatus = deriveQualification(leadScore, 'New');
 
+    const affiliateId = await resolveAffiliateId(utmCampaign);
+
     try {
       await prisma.enquiry.create({
         data: {
           studentId:   student.id,
           collegeId:   careerCollegeId,
           counselorId: counselorId || null,
+          affiliateId,
           status:      'New',
           source:      'Career Clarity',
           utmSource, utmMedium, utmCampaign,
