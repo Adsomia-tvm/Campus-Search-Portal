@@ -51,11 +51,28 @@ router.get('/:id', validate(idParam), async (req, res, next) => {
 // POST /api/admin/affiliates
 router.post('/', requireAdmin, validate(createAffiliate), async (req, res, next) => {
   try {
+    if (!prisma.affiliate) {
+      // Prisma client wasn't regenerated against the new schema — the
+      // Affiliate model is missing from the runtime client. Surfacing this
+      // clearly beats a generic "Invalid request" from the error handler.
+      return res.status(500).json({
+        error: 'Affiliate model missing from Prisma client on the server. Redeploy with a clean build (cache cleared) so `prisma generate` re-runs.',
+      });
+    }
     const affiliate = await prisma.affiliate.create({ data: req.body });
     res.status(201).json(affiliate);
   } catch (err) {
     if (err?.code === 'P2002') {
       return res.status(400).json({ error: `Affiliate code "${req.body.code}" is already taken.` });
+    }
+    // Surface the real Prisma error to the client so we don't have to dig
+    // through Vercel logs every time. Admin-only endpoint, low risk.
+    if (err?.name?.startsWith('PrismaClient')) {
+      return res.status(400).json({
+        error: 'Affiliate create failed',
+        prismaCode: err.code,
+        detail: err.message,
+      });
     }
     next(err);
   }
@@ -72,6 +89,13 @@ router.put('/:id', requireAdmin, validate(updateAffiliate), async (req, res, nex
   } catch (err) {
     if (err?.code === 'P2002') {
       return res.status(400).json({ error: `Affiliate code "${req.body.code}" is already taken.` });
+    }
+    if (err?.name?.startsWith('PrismaClient')) {
+      return res.status(400).json({
+        error: 'Affiliate update failed',
+        prismaCode: err.code,
+        detail: err.message,
+      });
     }
     next(err);
   }
