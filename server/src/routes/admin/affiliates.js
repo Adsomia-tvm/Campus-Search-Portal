@@ -1,8 +1,23 @@
 const router = require('express').Router();
+const bcrypt = require('bcryptjs');
 const prisma = require('../../lib/prisma');
 const { requireTeamMember, requireAdmin } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { createAffiliate, updateAffiliate, idParam } = require('../../middleware/schemas');
+
+// Strip + transform the writeable affiliate fields. Hashes `password` into
+// `passwordHash` so callers can set/reset the affiliate portal password
+// from the admin UI without ever sending the plaintext back out.
+async function pickAffiliateFields(body) {
+  const allowed = ['name','email','phone','code','type','commissionPerLead','commissionPerEnrolled',
+                    'paymentCadence','upiId','bankAccount','ifsc','panNumber','gstNumber','notes','isActive'];
+  const data = {};
+  for (const k of allowed) if (body[k] !== undefined) data[k] = body[k];
+  if (body.password) {
+    data.passwordHash = await bcrypt.hash(body.password, 12);
+  }
+  return data;
+}
 
 router.use(requireTeamMember);
 
@@ -51,7 +66,10 @@ router.get('/:id', validate(idParam), async (req, res, next) => {
 // POST /api/admin/affiliates
 router.post('/', requireAdmin, validate(createAffiliate), async (req, res, next) => {
   try {
-    const affiliate = await prisma.affiliate.create({ data: req.body });
+    const data = await pickAffiliateFields(req.body);
+    const affiliate = await prisma.affiliate.create({ data });
+    // Don't echo passwordHash back to clients.
+    delete affiliate.passwordHash;
     res.status(201).json(affiliate);
   } catch (err) {
     if (err?.code === 'P2002') {
@@ -64,10 +82,12 @@ router.post('/', requireAdmin, validate(createAffiliate), async (req, res, next)
 // PUT /api/admin/affiliates/:id
 router.put('/:id', requireAdmin, validate(updateAffiliate), async (req, res, next) => {
   try {
+    const data = await pickAffiliateFields(req.body);
     const affiliate = await prisma.affiliate.update({
       where: { id: Number(req.params.id) },
-      data: req.body,
+      data,
     });
+    delete affiliate.passwordHash;
     res.json(affiliate);
   } catch (err) {
     if (err?.code === 'P2002') {

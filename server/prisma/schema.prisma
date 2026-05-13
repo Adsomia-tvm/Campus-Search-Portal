@@ -357,7 +357,7 @@ model Affiliate {
   name                 String
   email                String?
   phone                String?
-  code                 String   @unique  // matches utm_campaign (lowercase, no spaces)
+  code                 String   @unique  // matches utm_campaign (lowercase, no spaces) — also their login username
   type                 String   @default("influencer") // influencer / blogger / counsellor / agency / other
   commissionPerLead    Int?     // INR — paid per qualified lead (Contacted or beyond)
   commissionPerEnrolled Int?    // INR — paid per Enrolled status
@@ -372,6 +372,11 @@ model Affiliate {
   joinedAt             DateTime @default(now())
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+
+  // Affiliate self-service portal — login with code + password.
+  // Admin sets/resets via /admin/affiliates modal.
+  passwordHash         String?
+  lastLoginAt          DateTime?
 
   enquiries Enquiry[]
 

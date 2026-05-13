@@ -115,6 +115,8 @@ app.use('/api/admin/reports',       require('./routes/admin/reports'));
 app.use('/api/admin/import',        require('./routes/admin/import'));
 app.use('/api/admin/users',         require('./routes/admin/users'));
 app.use('/api/admin/affiliates',    require('./routes/admin/affiliates'));
+app.use('/api/affiliate/auth',      require('./routes/affiliate/auth'));
+app.use('/api/affiliate/dashboard', require('./routes/affiliate/dashboard'));
 app.use('/api/admin/tiers',         require('./routes/admin/tiers'));
 app.use('/api/admin/bulk',          require('./routes/admin/bulk'));
 app.use('/api/admin/audit',         require('./routes/admin/audit'));

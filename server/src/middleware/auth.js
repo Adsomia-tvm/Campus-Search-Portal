@@ -69,6 +69,16 @@ function requireStudent(req, res, next) {
   });
 }
 
+// Affiliate user — separate token issuer from staff/admin. The JWT must
+// carry { role: 'affiliate', affiliateId: <int> }.
+function requireAffiliate(req, res, next) {
+  requireAuth(req, res, () => {
+    if (req.user.role !== 'affiliate' || !req.user.affiliateId)
+      return res.status(403).json({ error: 'Forbidden — affiliate account required' });
+    next();
+  });
+}
+
 // Any authenticated user with one of the specified roles
 function requireRole(...roles) {
   return (req, res, next) => {
@@ -80,4 +90,4 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { requireAuth, requireAdmin, requireStaff, requireTeamMember, requireCollege, requireAgent, requireStudent, requireRole };
+module.exports = { requireAuth, requireAdmin, requireStaff, requireTeamMember, requireCollege, requireAgent, requireStudent, requireAffiliate, requireRole };

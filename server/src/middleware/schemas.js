@@ -258,6 +258,9 @@ const createAffiliate = z.object({
     gstNumber:             z.string().max(20).optional().nullable(),
     notes:                 z.string().max(2000).optional().nullable(),
     isActive:              z.boolean().optional(),
+    // Optional — admin may set a portal password while creating the
+    // affiliate. Hashed before storage in the route handler.
+    password:              z.string().min(6).max(100).optional(),
   }),
 });
 
