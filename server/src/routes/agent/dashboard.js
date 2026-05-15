@@ -29,7 +29,13 @@ router.get('/dashboard', async (req, res, next) => {
 
     const totalLeads = statusCounts.reduce((sum, s) => sum + s._count, 0);
     const enrolled = statusCounts.find(s => s.status === 'Enrolled')?._count || 0;
-    const active = statusCounts.filter(s => !['Enrolled', 'Dropped'].includes(s.status))
+    // "Active" leads = currently being worked. Excludes terminal buckets
+    // (Enrolled = won, Dropped = lost, Junk = invalid) AND parked buckets
+    // (Follow-up = nurture pool for next admission cycle, not in active
+    // play right now). Without these exclusions agents see inflated
+    // active counts that include leads they're no longer touching.
+    const TERMINAL_OR_PARKED = ['Enrolled', 'Dropped', 'Junk', 'Follow-up'];
+    const active = statusCounts.filter(s => !TERMINAL_OR_PARKED.includes(s.status))
       .reduce((sum, s) => sum + s._count, 0);
 
     // Commission summary — use direct agentId on commission

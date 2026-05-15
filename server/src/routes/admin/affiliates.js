@@ -121,9 +121,10 @@ router.delete('/:id', requireAdmin, validate(idParam), async (req, res, next) =>
 //
 // Returns aggregated counts (total / qualified / enrolled / junk) plus the
 // commission owed for the month based on commissionPerLead +
-// commissionPerEnrolled. Qualified = any status past 'New' that isn't Junk
-// (so the affiliate is paid for leads that the counselor at least engaged
-// with, not for spam / unworked rows).
+// commissionPerEnrolled. Qualified = the counsellor actually engaged the
+// lead — i.e. status is past 'New', past 'Attempted' (which means we
+// tried to call but didn't connect), and not 'Junk'. Without this filter
+// affiliates would be paid per RNR call, not per real conversation.
 router.get('/:id/report', validate(idParam), async (req, res, next) => {
   try {
     const id = Number(req.params.id);
@@ -145,9 +146,17 @@ router.get('/:id/report', validate(idParam), async (req, res, next) => {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Statuses that don't count as "qualified" for affiliate commission:
+    //   New       — counsellor hasn't touched the lead yet
+    //   Attempted — counsellor called but didn't connect (RNR/busy)
+    //   Junk      — fake/spam/invalid lead
+    // Everything else (Connected, Counselling Done, Visited, Applied,
+    // Enrolled, Follow-up, Dropped) represents a real conversation
+    // happened, so it counts toward per-lead commission.
+    const UNQUALIFIED = new Set(['New', 'Attempted', 'Junk']);
     const counts = {
       total:     enquiries.length,
-      qualified: enquiries.filter(e => e.status !== 'New' && e.status !== 'Junk').length,
+      qualified: enquiries.filter(e => !UNQUALIFIED.has(e.status)).length,
       enrolled:  enquiries.filter(e => e.status === 'Enrolled').length,
       junk:      enquiries.filter(e => e.status === 'Junk').length,
     };

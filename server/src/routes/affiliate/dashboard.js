@@ -25,9 +25,14 @@ async function bucketCounts(where) {
   const total     = groups.reduce((s, g) => s + g._count.id, 0);
   const enrolled  = map.Enrolled || 0;
   const junk      = map.Junk     || 0;
-  // Qualified = anything past "New" that isn't junk. Same logic as the
-  // admin monthly report so totals reconcile.
-  const qualified = total - (map.New || 0) - junk;
+  // Qualified = real conversation happened with the lead. Excludes:
+  //   New       — untouched
+  //   Attempted — called but didn't connect (RNR/busy/switched off)
+  //   Junk      — fake / spam / invalid
+  // Must match the admin /api/admin/affiliates/:id/report logic so totals
+  // reconcile across views.
+  const attempted = map.Attempted || 0;
+  const qualified = total - (map.New || 0) - attempted - junk;
   return { total, qualified, enrolled, junk };
 }
 
