@@ -21,8 +21,12 @@ const STATUSES = ENQUIRY_STATUSES;
 // - consultant: see only enquiries for their assigned colleges
 router.get('/', async (req, res, next) => {
   try {
-    const { status, counselorId, courseId, collegeId, category, search, page = 1, limit = 30 } = req.query;
+    const { status, counselorId, courseId, collegeId, category, stream, eduStage, search, page = 1, limit = 30 } = req.query;
     const where = {};
+    // Filters that live on the related Student row — collect into one
+    // object so they combine via Prisma's relation AND semantics rather
+    // than overwriting each other.
+    const studentWhere = {};
 
     // Consultant scope — only their colleges
     if (req.user.role === 'consultant') {
@@ -67,6 +71,13 @@ router.get('/', async (req, res, next) => {
     if (counselorId && req.user.role !== 'staff') {
       where.counselorId = Number(counselorId);
     }
+    // Student-side filters — populated via Career Clarity quiz + public
+    // enquiry form. `stream` is a structured column on Student; `eduStage`
+    // lives in Student.notes as "Stage: <value>" (e.g. "Stage: plus_two"),
+    // so we do a substring match.
+    if (stream)    studentWhere.stream = stream;
+    if (eduStage)  studentWhere.notes  = { contains: `Stage: ${eduStage}`, mode: 'insensitive' };
+    if (Object.keys(studentWhere).length) where.student = studentWhere;
     if (search) where.OR = [
       { student: { name:  { contains: search, mode: 'insensitive' } } },
       { student: { phone: { contains: search } } },
