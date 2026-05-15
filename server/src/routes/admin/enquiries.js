@@ -14,11 +14,14 @@ router.use(requireTeamMember);
 const STATUSES = ENQUIRY_STATUSES;
 
 // GET /api/admin/enquiries
-// - admin/staff: see all
+// - admin:      see all
+// - staff:      see only enquiries where they are the assigned counselor
+//               (counselors are scoped to their own pipeline; admin sees
+//               the whole org)
 // - consultant: see only enquiries for their assigned colleges
 router.get('/', async (req, res, next) => {
   try {
-    const { status, counselorId, search, page = 1, limit = 30 } = req.query;
+    const { status, counselorId, courseId, collegeId, category, search, page = 1, limit = 30 } = req.query;
     const where = {};
 
     // Consultant scope — only their colleges
@@ -34,8 +37,36 @@ router.get('/', async (req, res, next) => {
       where.collegeId = { in: collegeIds };
     }
 
-    if (status)      where.status = status;
-    if (counselorId) where.counselorId = Number(counselorId);
+    // Staff scope — only leads assigned to them. Mirrors the affiliate
+    // portal pattern: counselors get a focused view of their own pipeline
+    // without admin chrome.
+    if (req.user.role === 'staff') {
+      where.counselorId = req.user.id;
+    }
+
+    if (status)   where.status   = status;
+    if (courseId) where.courseId = Number(courseId);
+    // Filter by Course.category (Nursing / Engineering / Medical / …). Uses
+    // the course relation rather than a denormalised column. Specific
+    // courseId takes precedence (a course already implies a category).
+    if (category && !courseId) where.course = { category };
+    // For admin we let collegeId be filtered independently; for consultants
+    // the where.collegeId was already set above to `{ in: [...] }`, so we
+    // narrow within that subset.
+    if (collegeId) {
+      if (where.collegeId && typeof where.collegeId === 'object' && Array.isArray(where.collegeId.in)) {
+        where.collegeId = where.collegeId.in.includes(Number(collegeId)) ? Number(collegeId) : { in: [] };
+      } else {
+        where.collegeId = Number(collegeId);
+      }
+    }
+    // counselorId query param is for admin-side filtering only. Staff are
+    // already locked to their own id above; ignoring the param here
+    // prevents a staff user from passing ?counselorId=other to peek at
+    // another counsellor's pipeline.
+    if (counselorId && req.user.role !== 'staff') {
+      where.counselorId = Number(counselorId);
+    }
     if (search) where.OR = [
       { student: { name:  { contains: search, mode: 'insensitive' } } },
       { student: { phone: { contains: search } } },
@@ -125,12 +156,33 @@ router.put('/:id', validate(updateEnquiry), async (req, res, next) => {
     // Auto-update qualification status when status changes
     const updateData = pickEnquiryUpdate(req.body);
     let oldStatus = null;
+    const existing = await prisma.enquiry.findUnique({
+      where: { id: Number(req.params.id) },
+      select: { leadScore: true, status: true, counselorId: true, collegeId: true },
+    });
+    if (!existing) return res.status(404).json({ error: 'Enquiry not found' });
+
+    // Staff can only update leads assigned to them. Without this check a
+    // staff user could call PUT /api/admin/enquiries/:id with another
+    // counsellor's enquiry id and change its status/notes/follow-up.
+    if (req.user.role === 'staff' && existing.counselorId !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden — not your assigned lead' });
+    }
+    // Consultant can only update leads in their assigned colleges.
+    if (req.user.role === 'consultant') {
+      const assigned = await prisma.consultantCollege.findFirst({
+        where: { userId: req.user.id, collegeId: existing.collegeId },
+        select: { id: true },
+      });
+      if (!assigned) return res.status(403).json({ error: 'Forbidden — not in your assigned colleges' });
+    }
+    // Staff should not be able to re-assign the counselor field — that
+    // would let them hand off (or steal) leads. Strip from payload.
+    if (req.user.role === 'staff') delete updateData.counselorId;
+
     if (req.body.status) {
-      const existing = await prisma.enquiry.findUnique({ where: { id: Number(req.params.id) }, select: { leadScore: true, status: true } });
-      if (existing) {
-        oldStatus = existing.status;
-        updateData.qualificationStatus = deriveQualification(existing.leadScore || 0, req.body.status);
-      }
+      oldStatus = existing.status;
+      updateData.qualificationStatus = deriveQualification(existing.leadScore || 0, req.body.status);
     }
 
     const enquiry = await prisma.enquiry.update({

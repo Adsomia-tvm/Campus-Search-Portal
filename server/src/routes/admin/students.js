@@ -7,6 +7,10 @@ const { createStudent, updateStudent, idParam } = require('../../middleware/sche
 router.use(requireTeamMember);
 
 // GET /api/admin/students
+// - admin / consultant: see all students
+// - staff: see only students they are the assigned counselor for (matches
+//   the enquiries scoping so a counsellor's "Students" list lines up with
+//   the leads they actually own)
 router.get('/', async (req, res, next) => {
   try {
     const { search, source, page = 1, limit = 30 } = req.query;
@@ -17,6 +21,10 @@ router.get('/', async (req, res, next) => {
       { email: { contains: search, mode: 'insensitive' } },
     ];
     if (source) where.source = source;
+
+    if (req.user.role === 'staff') {
+      where.counselorId = req.user.id;
+    }
 
     const take = Math.min(Math.max(Number(limit) || 30, 1), 100);
     const skip = (Math.max(Number(page), 1) - 1) * take;
