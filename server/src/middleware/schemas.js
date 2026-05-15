@@ -48,12 +48,23 @@ const adminSetup = z.object({
 
 // ── Enquiry ──────────────────────────────────────────────────────────────────
 
+// Edtech sales pipeline stages — kept in funnel order for readability.
+// New: fresh lead.  Attempted: called, no answer.  Connected: spoke to lead.
+// Counselling Done: career test / detailed counsel complete.
+// Visited: campus visit done.  Applied: application submitted.
+// Enrolled: fees paid (Won).  Follow-up: nurture / future batch.
+// Dropped: Lost.  Junk: invalid / spam.
+const ENQUIRY_STATUSES = [
+  'New', 'Attempted', 'Connected', 'Counselling Done', 'Visited',
+  'Applied', 'Enrolled', 'Follow-up', 'Dropped', 'Junk',
+];
+
 const createEnquiry = z.object({
   body: z.object({
     studentId: positiveInt,
     collegeId: positiveInt,
     courseId: positiveInt.optional().nullable(),
-    status: z.enum(['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped', 'Junk']).default('New').optional(),
+    status: z.enum(ENQUIRY_STATUSES).default('New').optional(),
     counselorId: positiveInt.optional().nullable(),
     notes: z.string().max(2000).optional().nullable(),
   }),
@@ -62,7 +73,7 @@ const createEnquiry = z.object({
 const updateEnquiry = z.object({
   params: z.object({ id: positiveInt }),
   body: z.object({
-    status: z.enum(['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped', 'Junk']).optional(),
+    status: z.enum(ENQUIRY_STATUSES).optional(),
     counselorId: positiveInt.optional().nullable(),
     followUpDate: z.string().datetime().optional().nullable(),
     notes: z.string().max(2000).optional().nullable(),
@@ -276,6 +287,7 @@ const idParam = z.object({
 });
 
 module.exports = {
+  ENQUIRY_STATUSES,
   studentAuth,
   adminLogin,
   adminSetup,

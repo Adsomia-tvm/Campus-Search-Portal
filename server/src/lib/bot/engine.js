@@ -486,7 +486,7 @@ async function handleStatusPhone(phone, text, lower, session) {
     return `🔍 No applications found for phone number ${checkPhone}.\n\nIf you haven't applied yet, type *1* to search colleges and apply!\n\nType *HI* for main menu.`;
   }
 
-  const STATUS_EMOJI = { New: '📋', Contacted: '📞', Visited: '🏫', Applied: '📝', Enrolled: '✅', Dropped: '❌' };
+  const STATUS_EMOJI = { New: '📋', Attempted: '☎️', Connected: '📞', 'Counselling Done': '🧭', Visited: '🏫', Applied: '📝', Enrolled: '✅', 'Follow-up': '⏳', Dropped: '❌', Junk: '🗑️' };
 
   let reply = `📋 *Applications for ${student.name}*\n\n`;
   student.enquiries.forEach((enq, i) => {
@@ -598,7 +598,7 @@ async function agentLeadsSummary(agentId, agentName) {
     take: 10,
   });
 
-  const STATUS_EMOJI = { New: '📋', Contacted: '📞', Visited: '🏫', Applied: '📝', Enrolled: '✅', Dropped: '❌' };
+  const STATUS_EMOJI = { New: '📋', Attempted: '☎️', Connected: '📞', 'Counselling Done': '🧭', Visited: '🏫', Applied: '📝', Enrolled: '✅', 'Follow-up': '⏳', Dropped: '❌', Junk: '🗑️' };
 
   if (!enquiries.length) {
     return `📊 *${agentName}'s Leads*\n\nNo leads yet. Start referring students!\n\n*1.* Refer a Student\n*2.* My Commissions\n*3.* Main Menu`;

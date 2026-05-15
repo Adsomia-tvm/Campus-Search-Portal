@@ -145,8 +145,9 @@ router.get('/:id/dashboard', validate(idParam), async (req, res, next) => {
       }),
     ]);
 
-    // Normalise funnel — ensure all 6 statuses present, count=0 if none
-    const statusOrder = ['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped'];
+    // Normalise funnel — ensure all 9 pipeline statuses present (count=0 if
+    // none). Junk is excluded because it's a triage bucket, not a funnel stage.
+    const statusOrder = ['New', 'Attempted', 'Connected', 'Counselling Done', 'Visited', 'Applied', 'Enrolled', 'Follow-up', 'Dropped'];
     const funnelMap = Object.fromEntries(funnelRaw.map(r => [r.status, r._count._all]));
     const funnel = statusOrder.map(s => ({ status: s, count: funnelMap[s] || 0 }));
     const enrolledCount = funnelMap.Enrolled || 0;

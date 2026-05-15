@@ -3,10 +3,14 @@ const prisma = require('../../lib/prisma');
 const { requireAdmin } = require('../../middleware/auth');
 const { logAudit, getIp } = require('../../lib/audit');
 const { deriveQualification } = require('../../lib/leadScore');
+const { ENQUIRY_STATUSES } = require('../../middleware/schemas');
 
 router.use(requireAdmin);
 
-const STATUSES = ['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped'];
+// Bulk operations accept the full pipeline including Junk so admins can
+// mass-flag spam. Imported from schemas so this stays in lock-step with
+// the Zod validator.
+const STATUSES = ENQUIRY_STATUSES;
 
 // ── POST /api/admin/bulk/status — mass status update ────────────────────────
 router.post('/status', async (req, res, next) => {

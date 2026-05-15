@@ -128,7 +128,11 @@ model Enquiry {
   courseId       Int?
   agentId        Int?     // Referring agent (if lead came through an agent)
   affiliateId    Int?     // Affiliate marketer (matched via utm_campaign on create)
-  status         String   @default("New") // New / Contacted / Visited / Applied / Enrolled / Dropped / Junk
+  // Sales pipeline stage (edtech consultant flow).
+  // New → Attempted (called, no answer) → Connected (spoke to lead) →
+  // Counselling Done → Visited (campus visit) → Applied → Enrolled (Won).
+  // Side buckets: Follow-up (nurture / future batch), Dropped (Lost), Junk (invalid).
+  status         String   @default("New") // New / Attempted / Connected / Counselling Done / Visited / Applied / Enrolled / Follow-up / Dropped / Junk
   counselorId    Int?
   followUpDate   DateTime?
   notes          String?
@@ -359,7 +363,7 @@ model Affiliate {
   phone                String?
   code                 String   @unique  // matches utm_campaign (lowercase, no spaces) — also their login username
   type                 String   @default("influencer") // influencer / blogger / counsellor / agency / other
-  commissionPerLead    Int?     // INR — paid per qualified lead (Contacted or beyond)
+  commissionPerLead    Int?     // INR — paid per qualified lead (Connected or beyond)
   commissionPerEnrolled Int?    // INR — paid per Enrolled status
   paymentCadence       String   @default("monthly")   // monthly / per_enrollment
   upiId                String?

@@ -173,14 +173,25 @@ function mapSource(source) {
   return sourceMap[source] || 'Other';
 }
 
+// Map Campus Search sales stages → Zoho CRM Lead_Status picklist values.
+// Zoho's standard picklist is coarser than our 10 stages, so several deep-funnel
+// stages (Counselling Done / Visited / Applied) all roll up to "Pre-Qualified".
+// If finer Zoho granularity is needed, add custom picklist values in Zoho first.
 function mapStatus(status) {
   const statusMap = {
-    'New': 'Not Contacted',
-    'Contacted': 'Contacted',
-    'Visited': 'Contact in Future',
-    'Applied': 'Attempt to Contact',
-    'Enrolled': 'Closed - Converted',
-    'Dropped': 'Lost Lead',
+    'New':              'Not Contacted',
+    'Attempted':        'Attempted to Contact',
+    'Connected':        'Contacted',
+    'Counselling Done': 'Pre-Qualified',
+    'Visited':          'Pre-Qualified',
+    'Applied':          'Pre-Qualified',
+    'Enrolled':         'Closed - Converted',
+    'Follow-up':        'Contact in Future',
+    'Dropped':          'Lost Lead',
+    'Junk':             'Junk Lead',
+    // Back-compat: any rows still carrying the legacy "Contacted" label
+    // (in case sync runs before the data migration) map to the same Zoho value.
+    'Contacted':        'Contacted',
   };
   return statusMap[status] || 'Not Contacted';
 }
@@ -329,4 +340,6 @@ module.exports = {
   findLeadByEnquiryId,
   bulkSyncLeads,
   isConfigured,
+  // Exposed for one-off backfill scripts that need raw Zoho API access.
+  getAccessToken,
 };

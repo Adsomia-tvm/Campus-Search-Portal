@@ -49,7 +49,7 @@ router.get('/dashboard', async (req, res, next) => {
       }),
     ]);
 
-    const statusOrder = ['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped'];
+    const statusOrder = ['New', 'Attempted', 'Connected', 'Counselling Done', 'Visited', 'Applied', 'Enrolled', 'Follow-up', 'Dropped'];
     const funnelMap = Object.fromEntries(funnelRaw.map(r => [r.status, r._count._all]));
     const funnel = statusOrder.map(s => ({ status: s, count: funnelMap[s] || 0 }));
     const enrolled = funnelMap.Enrolled || 0;
@@ -145,7 +145,7 @@ router.get('/enquiries/:id', async (req, res, next) => {
 
 // ── PUT /api/college/enquiries/:id ───────────────────────────────────────────
 // COL-05: College can update status (accept/reject), add notes, set follow-up
-// Allowed transitions for college: New → Contacted, Contacted → Visited, etc.
+// Allowed transitions for college: New → Attempted/Connected → Counselling Done → Visited → Applied, plus side moves to Follow-up / Dropped.
 // College CANNOT set status to Enrolled (that's admin-only)
 router.put('/enquiries/:id', async (req, res, next) => {
   try {
@@ -157,11 +157,13 @@ router.put('/enquiries/:id', async (req, res, next) => {
     const { status, notes, followUpDate } = req.body;
     const data = {};
 
-    // Status validation — colleges can move through the funnel but not mark Enrolled
+    // Status validation — colleges can move leads through the funnel but
+    // not mark Enrolled (that confirms commission and stays admin-only).
+    // Junk is internal triage so we also keep it out of the college allowlist.
     if (status) {
-      const collegeAllowed = ['New', 'Contacted', 'Visited', 'Applied', 'Dropped'];
+      const collegeAllowed = ['New', 'Attempted', 'Connected', 'Counselling Done', 'Visited', 'Applied', 'Follow-up', 'Dropped'];
       if (!collegeAllowed.includes(status)) {
-        return res.status(400).json({ error: `College cannot set status to "${status}". Only admin can mark as Enrolled.` });
+        return res.status(400).json({ error: `College cannot set status to "${status}". Only admin can mark as Enrolled or Junk.` });
       }
       data.status = status;
     }

@@ -92,7 +92,7 @@ router.get('/trends', async (req, res, next) => {
 // Full conversion funnel with time-in-stage
 router.get('/funnel', async (req, res, next) => {
   try {
-    const statusOrder = ['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped'];
+    const statusOrder = ['New', 'Attempted', 'Connected', 'Counselling Done', 'Visited', 'Applied', 'Enrolled', 'Follow-up', 'Dropped'];
 
     const counts = await prisma.enquiry.groupBy({
       by: ['status'],

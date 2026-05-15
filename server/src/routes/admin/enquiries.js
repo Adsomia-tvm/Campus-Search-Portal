@@ -3,13 +3,15 @@ const prisma = require('../../lib/prisma');
 const zoho = require('../../lib/zohoCrm');
 const { requireTeamMember } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
-const { createEnquiry, updateEnquiry, idParam } = require('../../middleware/schemas');
+const { createEnquiry, updateEnquiry, idParam, ENQUIRY_STATUSES } = require('../../middleware/schemas');
 const { deriveQualification } = require('../../lib/leadScore');
 const { notifyNewEnquiry, notifyStatusChange } = require('../../lib/notify');
 
 router.use(requireTeamMember);
 
-const STATUSES = ['New', 'Contacted', 'Visited', 'Applied', 'Enrolled', 'Dropped', 'Junk'];
+// Single source of truth — exported from schemas.js so Zod validation and
+// the status-counts filter chips stay in lock-step.
+const STATUSES = ENQUIRY_STATUSES;
 
 // GET /api/admin/enquiries
 // - admin/staff: see all

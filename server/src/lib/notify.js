@@ -187,8 +187,19 @@ async function getCollegeContact(collegeId) {
   } catch { return null; }
 }
 
+// Emoji per stage — used in admin/counsellor email + WhatsApp status-change
+// notifications. Keep keys in sync with the 10-stage sales pipeline.
 const STATUS_EMOJI = {
-  New: '📋', Contacted: '📞', Visited: '🏫', Applied: '📝', Enrolled: '✅', Dropped: '❌',
+  New: '📋',
+  Attempted: '☎️',
+  Connected: '📞',
+  'Counselling Done': '🧭',
+  Visited: '🏫',
+  Applied: '📝',
+  Enrolled: '✅',
+  'Follow-up': '⏳',
+  Dropped: '❌',
+  Junk: '🗑️',
 };
 
 // ── New Enquiry ────────────────────────────────────────────────────────────
