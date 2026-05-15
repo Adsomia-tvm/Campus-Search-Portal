@@ -233,4 +233,85 @@ router.put('/:id', validate(updateEnquiry), async (req, res, next) => {
   }
 });
 
+// ── POST /api/admin/enquiries/rebalance ────────────────────────────────────
+// Admin-only: redistribute existing non-terminal leads evenly across the
+// active staff pool. Built primarily for the "new staff joined" scenario —
+// the auto-assignment in /api/enquiries already load-balances new leads,
+// but a fresh hire would otherwise have to wait for the next ~N leads to
+// catch up to peers. This one-shot rebalance gives them their fair share
+// immediately.
+//
+// Rebalance is done at the *student* level (not the enquiry level) so a
+// student's pipeline stays with one counsellor. Only students with at
+// least one non-terminal enquiry are reassigned; settled records
+// (Enrolled / Dropped / Junk) keep their historical counselor for audit
+// continuity.
+//
+// Returns { studentsReassigned, enquiriesReassigned, perStaff }.
+router.post('/rebalance', async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden — admin only' });
+    }
+
+    // Active staff pool, ordered by id for deterministic rotation.
+    const staff = await prisma.user.findMany({
+      where: { role: 'staff', isActive: true },
+      select: { id: true, name: true },
+      orderBy: { id: 'asc' },
+    });
+    if (staff.length === 0) {
+      return res.status(400).json({ error: 'No active staff to assign leads to.' });
+    }
+
+    // Terminal statuses — leads in these buckets aren't being worked, so
+    // we leave them with their historical counselor.
+    const TERMINAL = ['Enrolled', 'Dropped', 'Junk'];
+
+    // Find students that have at least one non-terminal enquiry. We
+    // operate at this granularity so a returning student doesn't end up
+    // with one counselor for their Nursing enquiry and another for their
+    // Engineering enquiry.
+    const students = await prisma.student.findMany({
+      where: {
+        enquiries: { some: { status: { notIn: TERMINAL } } },
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
+    let enquiriesReassigned = 0;
+    const perStaff = Object.fromEntries(staff.map(s => [s.id, { name: s.name, count: 0 }]));
+
+    // Round-robin assignment, one student at a time. Transaction per
+    // student keeps the Student + Enquiry updates atomic without holding
+    // a giant lock across the whole rebalance.
+    for (let i = 0; i < students.length; i++) {
+      const newCounselorId = staff[i % staff.length].id;
+      const studentId = students[i].id;
+
+      const result = await prisma.$transaction([
+        prisma.student.update({
+          where: { id: studentId },
+          data:  { counselorId: newCounselorId },
+        }),
+        prisma.enquiry.updateMany({
+          where: { studentId, status: { notIn: TERMINAL } },
+          data:  { counselorId: newCounselorId },
+        }),
+      ]);
+      enquiriesReassigned += result[1].count;
+      perStaff[newCounselorId].count += 1; // students per staff
+    }
+
+    res.json({
+      studentsReassigned: students.length,
+      enquiriesReassigned,
+      perStaff: Object.values(perStaff),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
