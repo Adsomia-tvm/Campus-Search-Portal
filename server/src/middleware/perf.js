@@ -9,13 +9,20 @@
 
 const { searchCache } = require('../cache');
 
-// ── Response Time Header ───────────────────────────────────────────────────
+// ── Response Time Logging ──────────────────────────────────────────────────
+// IMPORTANT: don't call res.setHeader() inside res.on('finish', ...) — by the
+// time 'finish' fires, the response is already sent and headers are locked.
+// Node 24.x throws ERR_HTTP_HEADERS_SENT here, which crashes the Vercel
+// lambda and makes every request return 500. Instead we record timing on
+// 'finish' and only log slow requests for monitoring; the X-Response-Time
+// header is not strictly needed (Vercel exposes its own duration metrics).
 function responseTime(req, res, next) {
   const start = process.hrtime.bigint();
   res.on('finish', () => {
-    const ns = process.hrtime.bigint() - start;
-    const ms = Number(ns / 1000000n);
-    res.setHeader('X-Response-Time', `${ms}ms`);
+    const ms = Number((process.hrtime.bigint() - start) / 1000000n);
+    if (ms > 1000) {
+      console.warn(`[slow] ${req.method} ${req.originalUrl} ${ms}ms status=${res.statusCode}`);
+    }
   });
   next();
 }
