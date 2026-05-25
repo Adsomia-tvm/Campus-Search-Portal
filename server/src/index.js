@@ -6,6 +6,16 @@ const _path = require('path');
 
 const app = express();
 
+// ── Trust Vercel's reverse proxy ─────────────────────────────────────────────
+// Vercel sits in front of every Express request and sets X-Forwarded-For with
+// the real client IP. Without this, express-rate-limit v7+ throws a
+// ValidationError on every request behind a proxy, returning 500 with the
+// generic "Something went wrong" message via errorHandler.js.
+//
+// `1` = trust the first proxy in the chain (Vercel's edge). Don't use `true`
+// in production — that trusts all upstream proxies and lets clients spoof IPs.
+app.set('trust proxy', 1);
+
 // ── Security headers ──────────────────────────────────────────────────────────
 app.disable('x-powered-by'); // Don't reveal Express
 app.use((req, res, next) => {
