@@ -65,10 +65,24 @@ function errorHandler(err, req, res, _next) {
     ...(isDev && { stack: err.stack }),
   }));
 
-  // Safe response to client
+  // Safe response to client. Detail is normally only shown in dev — but if
+  // the caller sets the `X-Debug-Errors: 1` header AND the matching shared
+  // secret env var is set, we expose the raw error so we can diagnose
+  // production-only failures without leaking detail to all clients.
+  const debugRequested = req.get('x-debug-errors') === '1'
+    && process.env.DEBUG_ERRORS_SECRET
+    && req.get('x-debug-secret') === process.env.DEBUG_ERRORS_SECRET;
+
+  // ── TEMP DEBUG (2026-05-25): expose detail unconditionally so we can
+  //    diagnose the Prisma /api/colleges 500. Revert immediately after fix.
+  const tempUnconditionalDebug = true;
+
   res.status(status).json({
     error: clientMessage,
-    ...(isDev && { detail: err.message }),
+    ...((isDev || debugRequested || tempUnconditionalDebug) && {
+      detail: err.message,
+      code: err.code,
+    }),
   });
 }
 
